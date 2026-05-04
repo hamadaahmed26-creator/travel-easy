@@ -181,34 +181,7 @@ class TestOptimize:
             assert o["total_price"] > 200
 
 
-# --- saved trips (persistence) ----------------------------------------------
-class TestSavedTrips:
-    def test_save_list_delete_flow(self, api):
-        # 1. Get a trip option from the optimiser
-        opt = api.post(f"{BASE_URL}/api/optimize", json=BASE_OPTIMIZE, timeout=45).json()
-        trip = opt["options"][0]
-
-        # 2. Save it
-        save_res = api.post(f"{BASE_URL}/api/trips/save", json={"trip": trip}, timeout=30)
-        assert save_res.status_code == 200, save_res.text
-        saved = save_res.json()
-        assert saved["trip"]["id"] == trip["id"]
-        saved_id = saved["id"]
-
-        # 3. List and verify no _id leakage, and our saved trip is present
-        list_res = api.get(f"{BASE_URL}/api/trips", timeout=30)
-        assert list_res.status_code == 200
-        items = list_res.json()
-        assert any(x["id"] == saved_id for x in items)
-        for item in items:
-            assert "_id" not in item, f"Mongo _id leaked in response: {item}"
-            assert "_id" not in item.get("trip", {}), "Mongo _id leaked inside trip"
-
-        # 4. Delete it
-        del_res = api.delete(f"{BASE_URL}/api/trips/{saved_id}", timeout=30)
-        assert del_res.status_code == 200
-        assert del_res.json()["deleted"] == saved_id
-
-        # 5. Deleting again should 404
-        del_again = api.delete(f"{BASE_URL}/api/trips/{saved_id}", timeout=30)
-        assert del_again.status_code == 404
+# --- saved trips — now auth-gated; covered in test_pro_mode.py --------------
+# (The un-authenticated save/list/delete flow from iteration 3 was moved to
+# /api/trips gated endpoints; see tests in test_pro_mode.py::TestTripScoping
+# and TestWatchLimit which exercise save → list → delete with bearer tokens.)

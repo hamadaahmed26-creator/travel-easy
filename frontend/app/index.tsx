@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
-import { useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -18,6 +18,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { api, type Airport, type Destination, type OptimizeRequest } from "../src/api";
+import { useAuth } from "../src/auth";
 import { persistResults } from "../src/store";
 import { colors, radii, spacing } from "../src/theme";
 
@@ -26,6 +27,7 @@ type HotelPref = "any" | "budget" | "mid";
 
 export default function SearchScreen() {
   const router = useRouter();
+  const { user, refresh } = useAuth();
   const [airports, setAirports] = useState<Airport[]>([]);
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [departure, setDeparture] = useState<string>("BRS");
@@ -51,6 +53,8 @@ export default function SearchScreen() {
       }
     })();
   }, []);
+
+  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
   const departureMeta = useMemo(
     () => airports.find((a) => a.code === departure),
@@ -127,20 +131,37 @@ export default function SearchScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <View>
-              <Text style={styles.eyebrow} testID="brand-eyebrow">TRIPOPT · v1</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.eyebrow} testID="brand-eyebrow">
+                TRIPOPT · {user?.is_pro ? "PRO" : "v1"}
+              </Text>
               <Text style={styles.title} testID="screen-title">Optimise the whole trip.</Text>
               <Text style={styles.subtitle}>
                 Flights, hotels, dates — ranked like a portfolio. Cheapest combined cost wins.
               </Text>
             </View>
-            <TouchableOpacity
-              testID="open-saved-btn"
-              style={styles.savedBtn}
-              onPress={() => router.push("/saved")}
-            >
-              <Ionicons name="bookmark-outline" size={20} color={colors.ink} />
-            </TouchableOpacity>
+            <View style={{ flexDirection: "row", gap: spacing.sm }}>
+              {user ? (
+                <TouchableOpacity
+                  testID="open-alerts-btn"
+                  style={styles.savedBtn}
+                  onPress={() => router.push("/alerts")}
+                >
+                  <Ionicons name="notifications-outline" size={20} color={colors.ink} />
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity
+                testID="open-saved-btn"
+                style={styles.savedBtn}
+                onPress={() => router.push(user ? "/saved" : "/login")}
+              >
+                <Ionicons
+                  name={user ? "bookmark-outline" : "person-circle-outline"}
+                  size={20}
+                  color={colors.ink}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Departure */}

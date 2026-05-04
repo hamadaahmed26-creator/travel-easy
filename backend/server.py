@@ -1,11 +1,11 @@
-"""TripOpt backend — Total Trip Optimiser.
+"""TripOpt backend — Pro Mode edition.
 
-Generates deterministic mock flight + hotel data for UK departures and runs a
-portfolio-style optimiser across a date range. Returns ranked trip options
-(Cheapest, Best Value, Lowest Risk) with Book-now/Wait recommendations.
+Adds: Emergent Google Auth, Stripe Pro paywall, push notifications, watched-trip
+price scheduler, and in-app alerts inbox. Original optimisation engine intact.
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 import os
@@ -17,8 +17,14 @@ from pathlib import Path
 from typing import List, Literal, Optional
 from urllib.parse import quote_plus
 
+import httpx
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
-from fastapi import APIRouter, FastAPI, HTTPException
+from emergentintegrations.payments.stripe.checkout import (
+    CheckoutSessionRequest,
+    StripeCheckout,
+)
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 from starlette.middleware.cors import CORSMiddleware
@@ -36,10 +42,15 @@ api = APIRouter(prefix="/api")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("tripopt")
 
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+EMERGENT_AUTH_SESSION_DATA_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data"
+EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
+PRO_PRICE_GBP = 2.99  # £2.99 = 30 days of Pro
+PRO_DAYS = 30
+FREE_WATCH_LIMIT = 1
 
-# ---------------------------------------------------------------------------
-# Static reference data
-# ---------------------------------------------------------------------------
 UK_AIRPORTS = [
     {"code": "LHR", "city": "London", "name": "Heathrow"},
     {"code": "LGW", "city": "London", "name": "Gatwick"},
@@ -54,7 +65,6 @@ UK_AIRPORTS = [
 ]
 
 DESTINATIONS = [
-    # weather: sun | city | both
     {"code": "BCN", "city": "Barcelona", "country": "Spain", "weather": "both", "base_flight": 95, "base_hotel": 85, "volatility": 0.18},
     {"code": "AGP", "city": "Malaga", "country": "Spain", "weather": "sun", "base_flight": 80, "base_hotel": 70, "volatility": 0.22},
     {"code": "PMI", "city": "Palma de Mallorca", "country": "Spain", "weather": "sun", "base_flight": 90, "base_hotel": 78, "volatility": 0.25},
@@ -84,16 +94,11 @@ AIRLINES = [
 ]
 
 HOTEL_BRANDS = [
-    ("budget", "Ibis Budget", 3.6),
-    ("budget", "Premier Inn", 4.1),
-    ("budget", "B&B Hotels", 3.8),
-    ("budget", "Travelodge", 3.7),
-    ("mid", "NH Hotels", 4.3),
-    ("mid", "Mercure", 4.2),
-    ("mid", "Holiday Inn", 4.0),
-    ("mid", "Novotel", 4.4),
-    ("mid", "Hilton Garden Inn", 4.5),
-    ("mid", "Marriott Courtyard", 4.4),
+    ("budget", "Ibis Budget", 3.6), ("budget", "Premier Inn", 4.1),
+    ("budget", "B&B Hotels", 3.8), ("budget", "Travelodge", 3.7),
+    ("mid", "NH Hotels", 4.3), ("mid", "Mercure", 4.2),
+    ("mid", "Holiday Inn", 4.0), ("mid", "Novotel", 4.4),
+    ("mid", "Hilton Garden Inn", 4.5), ("mid", "Marriott Courtyard", 4.4),
 ]
 
 
@@ -101,70 +106,54 @@ HOTEL_BRANDS = [
 # Models
 # ---------------------------------------------------------------------------
 class OptimizeRequest(BaseModel):
-    departure: str = Field(..., description="UK airport IATA code")
-    destination: Optional[str] = Field(None, description="Destination IATA code or None for Anywhere")
+    departure: str
+    destination: Optional[str] = None
     budget: int = Field(..., ge=100, le=5000)
-    trip_length: int = Field(..., ge=2, le=21, description="Nights")
-    flexibility_days: int = Field(0, ge=0, le=14, description="± days flexibility around start window")
+    trip_length: int = Field(..., ge=2, le=21)
+    flexibility_days: int = Field(0, ge=0, le=14)
     weather: Literal["sun", "city", "any"] = "any"
     hotel_standard: Literal["budget", "mid", "any"] = "any"
-    start_window_days: int = Field(30, ge=1, le=180, description="Start of search window from today")
+    start_window_days: int = Field(30, ge=1, le=180)
 
 
 class FlightOption(BaseModel):
-    airline: str
-    airline_code: str
-    flight_number: str
-    depart_time: str
-    return_time: str
-    price: float
-    stops: int
+    airline: str; airline_code: str; flight_number: str
+    depart_time: str; return_time: str; price: float; stops: int
 
 
 class HotelOption(BaseModel):
-    name: str
-    rating: float
-    distance_km: float
-    nightly_rate: float
-    total: float
-    standard: str
+    name: str; rating: float; distance_km: float
+    nightly_rate: float; total: float; standard: str
 
 
 class TripOption(BaseModel):
-    id: str
-    rank_label: str  # "Cheapest" | "Best Value" | "Lowest Risk"
-    departure: str
-    departure_city: str
-    destination: str
-    destination_city: str
-    destination_country: str
+    id: str; rank_label: str
+    departure: str; departure_city: str
+    destination: str; destination_city: str; destination_country: str
     weather: str
-    check_in: str
-    check_out: str
-    nights: int
-    flight: FlightOption
-    hotel: HotelOption
-    total_price: float
-    currency: str = "GBP"
-    rating_score: float
-    risk_score: float  # 0-100, lower = lower risk (less likely to spike)
+    check_in: str; check_out: str; nights: int
+    flight: FlightOption; hotel: HotelOption
+    total_price: float; currency: str = "GBP"
+    rating_score: float; risk_score: float
     recommendation: Literal["book_now", "wait"]
-    confidence: int  # 0-100
-    rationale: str
-    headline: str  # short, share-ready one-liner
-    savings_vs_budget: float  # positive = under budget, negative = over budget
-    affiliate_flight_url: str
-    affiliate_hotel_url: str
-    price_history: List[float]  # last 30 days simulated
-    price_forecast: List[float]  # next 14 days simulated
+    confidence: int; rationale: str
+    headline: str; savings_vs_budget: float
+    affiliate_flight_url: str; affiliate_hotel_url: str
+    price_history: List[float]; price_forecast: List[float]
 
 
 class OptimizeResponse(BaseModel):
-    request_id: str
-    generated_at: str
+    request_id: str; generated_at: str
     options: List[TripOption]
-    searched_combinations: int
-    median_total: float
+    searched_combinations: int; median_total: float
+
+
+class User(BaseModel):
+    user_id: str; email: str; name: str
+    picture: Optional[str] = None
+    pro_until: Optional[str] = None  # ISO datetime; None = free
+    is_pro: bool = False
+    created_at: str
 
 
 class SaveTripRequest(BaseModel):
@@ -172,13 +161,33 @@ class SaveTripRequest(BaseModel):
 
 
 class SavedTrip(BaseModel):
-    id: str
-    saved_at: str
+    id: str; user_id: str; saved_at: str
     trip: TripOption
+    is_watching: bool = False
+    last_seen_total: Optional[float] = None
+    last_seen_recommendation: Optional[str] = None
+
+
+class CheckoutRequest(BaseModel):
+    origin_url: str  # frontend window.location.origin
+
+
+class PushRegisterRequest(BaseModel):
+    expo_token: str
+    platform: str = "unknown"
+
+
+class Notification(BaseModel):
+    id: str; user_id: str
+    title: str; body: str
+    saved_trip_id: Optional[str] = None
+    data: dict = {}
+    created_at: str
+    read: bool = False
 
 
 # ---------------------------------------------------------------------------
-# Pricing engine (deterministic seeded mock)
+# Pricing engine (unchanged from MVP)
 # ---------------------------------------------------------------------------
 def _seed(*parts: str) -> int:
     h = hashlib.md5("|".join(parts).encode()).hexdigest()
@@ -189,155 +198,108 @@ def _rng(*parts: str) -> random.Random:
     return random.Random(_seed(*parts))
 
 
-def _airport(code: str) -> Optional[dict]:
-    return next((a for a in UK_AIRPORTS if a["code"] == code), None)
-
-
-def _destination(code: str) -> Optional[dict]:
-    return next((d for d in DESTINATIONS if d["code"] == code), None)
+def _airport(code: str): return next((a for a in UK_AIRPORTS if a["code"] == code), None)
+def _destination(code: str): return next((d for d in DESTINATIONS if d["code"] == code), None)
 
 
 def _seasonal_multiplier(day: datetime) -> float:
-    # School holidays / summer peaks: simple sinusoid + summer/Christmas spikes
     month = day.month
-    base = 0.85 + 0.25 * abs((month - 1) % 12 - 6) / 6  # winter cheaper
-    if month in (7, 8):
-        base += 0.25
-    if month == 12 and day.day >= 18:
-        base += 0.30
-    if day.weekday() in (4, 6):  # Fri/Sun travel premium
-        base += 0.08
+    base = 0.85 + 0.25 * abs((month - 1) % 12 - 6) / 6
+    if month in (7, 8): base += 0.25
+    if month == 12 and day.day >= 18: base += 0.30
+    if day.weekday() in (4, 6): base += 0.08
     return base
 
 
-def _flight_price(dep: str, dest: str, day: datetime, base: float, volatility: float) -> float:
+def _flight_price(dep, dest, day, base, vol):
     rng = _rng("flt", dep, dest, day.isoformat())
-    seasonal = _seasonal_multiplier(day)
-    noise = rng.uniform(1 - volatility, 1 + volatility)
-    # Outbound + return combined
-    return round(base * 2 * seasonal * noise, 2)
+    return round(base * 2 * _seasonal_multiplier(day) * rng.uniform(1 - vol, 1 + vol), 2)
 
 
-def _hotel_price(dest: str, day: datetime, base: float, volatility: float) -> float:
+def _hotel_price(dest, day, base, vol):
     rng = _rng("htl", dest, day.isoformat())
-    seasonal = _seasonal_multiplier(day)
-    noise = rng.uniform(1 - volatility * 0.6, 1 + volatility * 0.6)
-    return round(base * seasonal * noise, 2)
+    return round(base * _seasonal_multiplier(day) * rng.uniform(1 - vol * 0.6, 1 + vol * 0.6), 2)
 
 
-def _build_flight_option(dep: str, dest: str, check_in: datetime, check_out: datetime, base: float, volatility: float) -> FlightOption:
+def _build_flight_option(dep, dest, check_in, check_out, base, vol):
     rng = _rng("fopt", dep, dest, check_in.isoformat())
     airline = rng.choice(AIRLINES)
-    price = _flight_price(dep, dest, check_in, base, volatility)
-    if airline["tier"] == "budget":
-        price *= 0.85
-    elif airline["tier"] == "full":
-        price *= 1.10
+    price = _flight_price(dep, dest, check_in, base, vol)
+    if airline["tier"] == "budget": price *= 0.85
+    elif airline["tier"] == "full": price *= 1.10
     flight_no = f"{airline['code']}{rng.randint(100, 9999)}"
-    dep_h = rng.randint(6, 21)
-    dep_m = rng.choice([0, 15, 30, 45])
-    ret_h = rng.randint(6, 21)
-    ret_m = rng.choice([0, 15, 30, 45])
+    dep_h, dep_m = rng.randint(6, 21), rng.choice([0, 15, 30, 45])
+    ret_h, ret_m = rng.randint(6, 21), rng.choice([0, 15, 30, 45])
     stops = 0 if rng.random() < 0.7 else 1
-    if stops == 1:
-        price *= 0.82
+    if stops: price *= 0.82
     return FlightOption(
-        airline=airline["name"],
-        airline_code=airline["code"],
-        flight_number=flight_no,
+        airline=airline["name"], airline_code=airline["code"], flight_number=flight_no,
         depart_time=f"{check_in.strftime('%a %d %b')} · {dep_h:02d}:{dep_m:02d}",
         return_time=f"{check_out.strftime('%a %d %b')} · {ret_h:02d}:{ret_m:02d}",
-        price=round(price, 2),
-        stops=stops,
+        price=round(price, 2), stops=stops,
     )
 
 
-def _build_hotel_option(dest: str, check_in: datetime, nights: int, base: float, volatility: float, standard_filter: str) -> HotelOption:
+def _build_hotel_option(dest, check_in, nights, base, vol, standard_filter):
     rng = _rng("hopt", dest, check_in.isoformat(), standard_filter)
-    candidates = [b for b in HOTEL_BRANDS if standard_filter in ("any", b[0])]
-    if not candidates:
-        candidates = HOTEL_BRANDS
+    candidates = [b for b in HOTEL_BRANDS if standard_filter in ("any", b[0])] or HOTEL_BRANDS
     standard, brand, base_rating = rng.choice(candidates)
-    nightly = _hotel_price(dest, check_in, base, volatility)
-    if standard == "mid":
-        nightly *= 1.45
+    nightly = _hotel_price(dest, check_in, base, vol)
+    if standard == "mid": nightly *= 1.45
     rating = round(min(5.0, base_rating + rng.uniform(-0.2, 0.3)), 1)
     distance = round(rng.uniform(0.3, 4.5), 1)
     suffix = rng.choice(["Central", "Plaza", "Old Town", "Riverside", "Airport", "Downtown"])
     return HotelOption(
-        name=f"{brand} {suffix}",
-        rating=rating,
-        distance_km=distance,
-        nightly_rate=round(nightly, 2),
-        total=round(nightly * nights, 2),
-        standard=standard,
+        name=f"{brand} {suffix}", rating=rating, distance_km=distance,
+        nightly_rate=round(nightly, 2), total=round(nightly * nights, 2), standard=standard,
     )
 
 
-def _affiliate_flight(dep: str, dest: str, check_in: datetime, check_out: datetime) -> str:
-    return (
-        "https://www.skyscanner.net/transport/flights/"
-        f"{dep.lower()}/{dest.lower()}/"
-        f"{check_in.strftime('%y%m%d')}/{check_out.strftime('%y%m%d')}/"
-    )
+def _affiliate_flight(dep, dest, check_in, check_out):
+    return f"https://www.skyscanner.net/transport/flights/{dep.lower()}/{dest.lower()}/{check_in.strftime('%y%m%d')}/{check_out.strftime('%y%m%d')}/"
 
 
-def _affiliate_hotel(city: str, check_in: datetime, check_out: datetime) -> str:
-    return (
-        "https://www.booking.com/searchresults.html?"
-        f"ss={quote_plus(city)}"
-        f"&checkin={check_in.strftime('%Y-%m-%d')}"
-        f"&checkout={check_out.strftime('%Y-%m-%d')}"
-    )
+def _affiliate_hotel(city, check_in, check_out):
+    return f"https://www.booking.com/searchresults.html?ss={quote_plus(city)}&checkin={check_in.strftime('%Y-%m-%d')}&checkout={check_out.strftime('%Y-%m-%d')}"
 
 
-def _price_history_and_forecast(base_total: float, volatility: float, dest_code: str) -> tuple[List[float], List[float], float]:
-    """Simulate trailing 30-day history + 14-day forecast. Returns (history, forecast, trend)."""
+def _price_history_and_forecast(base_total, vol, dest_code):
     rng = _rng("series", dest_code, str(round(base_total, 2)))
     history = []
     val = base_total * rng.uniform(0.92, 1.08)
     for _ in range(30):
-        val *= rng.uniform(1 - volatility * 0.05, 1 + volatility * 0.05)
+        val *= rng.uniform(1 - vol * 0.05, 1 + vol * 0.05)
         history.append(round(val, 2))
+    trend = (base_total - statistics.mean(history)) / max(1.0, statistics.mean(history))
     forecast = []
     forecast_val = base_total
-    # Trend: positive = rising prices => "Book now"
-    trend = (base_total - statistics.mean(history)) / max(1.0, statistics.mean(history))
     for i in range(14):
-        forecast_val *= rng.uniform(1 - volatility * 0.04, 1 + volatility * 0.06 + max(0, trend) * 0.01)
+        forecast_val *= rng.uniform(1 - vol * 0.04, 1 + vol * 0.06 + max(0, trend) * 0.01)
         forecast.append(round(forecast_val, 2))
     return history, forecast, trend
 
 
-def _evaluate_destination(req: OptimizeRequest, dest: dict) -> List[dict]:
-    """Generate one best (date, flight, hotel) candidate for this destination."""
+def _evaluate_destination(req: OptimizeRequest, dest: dict):
     today = datetime.now(timezone.utc).date()
     start = today + timedelta(days=req.start_window_days)
-    flex = max(req.flexibility_days, 3)  # always sample at least ±3 even if user picked 0
-    candidates = []
+    flex = max(req.flexibility_days, 3)
+    out = []
     for offset in range(-flex, flex + 1):
-        check_in_d = start + timedelta(days=offset)
-        check_out_d = check_in_d + timedelta(days=req.trip_length)
-        check_in = datetime.combine(check_in_d, datetime.min.time())
-        check_out = datetime.combine(check_out_d, datetime.min.time())
-        flight = _build_flight_option(req.departure, dest["code"], check_in, check_out, dest["base_flight"], dest["volatility"])
-        hotel = _build_hotel_option(dest["code"], check_in, req.trip_length, dest["base_hotel"], dest["volatility"], req.hotel_standard)
+        ci_d = start + timedelta(days=offset)
+        co_d = ci_d + timedelta(days=req.trip_length)
+        ci = datetime.combine(ci_d, datetime.min.time())
+        co = datetime.combine(co_d, datetime.min.time())
+        flight = _build_flight_option(req.departure, dest["code"], ci, co, dest["base_flight"], dest["volatility"])
+        hotel = _build_hotel_option(dest["code"], ci, req.trip_length, dest["base_hotel"], dest["volatility"], req.hotel_standard)
         total = round(flight.price + hotel.total, 2)
-        candidates.append({
-            "check_in": check_in,
-            "check_out": check_out,
-            "flight": flight,
-            "hotel": hotel,
-            "total": total,
-        })
-    return candidates
+        out.append({"check_in": ci, "check_out": co, "flight": flight, "hotel": hotel, "total": total})
+    return out
 
 
 def _optimise(req: OptimizeRequest) -> OptimizeResponse:
     dep_meta = _airport(req.departure)
     if not dep_meta:
         raise HTTPException(status_code=400, detail=f"Unknown departure airport {req.departure}")
-
     if req.destination:
         dests = [d for d in DESTINATIONS if d["code"] == req.destination]
         if not dests:
@@ -345,66 +307,40 @@ def _optimise(req: OptimizeRequest) -> OptimizeResponse:
     else:
         dests = list(DESTINATIONS)
     if req.weather != "any":
-        # "both" weather destinations qualify for either filter
         dests = [d for d in dests if d["weather"] == req.weather or d["weather"] == "both"]
-
-    all_candidates: List[dict] = []
+    all_candidates = []
     for d in dests:
         for c in _evaluate_destination(req, d):
             c["dest"] = d
             all_candidates.append(c)
-
     if not all_candidates:
         raise HTTPException(status_code=404, detail="No trip combinations found for these filters")
-
     totals = [c["total"] for c in all_candidates]
     median_total = round(statistics.median(totals), 2)
     mean_total = statistics.mean(totals)
-
-    # Apply budget filter as a soft preference (keep within budget if any qualify, else ignore)
     in_budget = [c for c in all_candidates if c["total"] <= req.budget]
     pool = in_budget if in_budget else all_candidates
-
-    # ---- Scoring ----
     for c in pool:
-        # Best value: high hotel rating per £, penalise distance
-        flt = c["flight"]
-        htl = c["hotel"]
-        c["value_score"] = round((htl.rating * 100) / (c["total"] / 100) - htl.distance_km * 2 - flt.stops * 5, 2)
+        c["value_score"] = round((c["hotel"].rating * 100) / (c["total"] / 100) - c["hotel"].distance_km * 2 - c["flight"].stops * 5, 2)
         history, forecast, trend = _price_history_and_forecast(c["total"], c["dest"]["volatility"], c["dest"]["code"])
-        c["history"] = history
-        c["forecast"] = forecast
-        c["trend"] = trend
-        # Risk: high volatility + rising trend = high risk
-        c["risk_score"] = round(min(100, max(0, (c["dest"]["volatility"] * 200) + max(0, trend) * 100)), 1)
-
+        c["history"], c["forecast"], c["trend"] = history, forecast, trend
+        c["risk_score"] = round(min(100, max(0, c["dest"]["volatility"] * 200 + max(0, trend) * 100)), 1)
     cheapest = min(pool, key=lambda c: c["total"])
     best_value = max(pool, key=lambda c: c["value_score"])
     lowest_risk = min(pool, key=lambda c: c["risk_score"])
-
-    # Ensure 3 distinct picks
-    chosen = []
-    seen = set()
+    chosen, seen = [], set()
     for label, cand in (("Cheapest", cheapest), ("Best Value", best_value), ("Lowest Risk", lowest_risk)):
         key = (cand["dest"]["code"], cand["check_in"].isoformat())
         if key in seen:
-            # find next-best that isn't chosen yet
             for alt in sorted(pool, key=lambda c: c["total"]):
-                alt_key = (alt["dest"]["code"], alt["check_in"].isoformat())
-                if alt_key not in seen:
-                    cand = alt
-                    key = alt_key
-                    break
-        seen.add(key)
-        chosen.append((label, cand))
-
+                ak = (alt["dest"]["code"], alt["check_in"].isoformat())
+                if ak not in seen:
+                    cand, key = alt, ak; break
+        seen.add(key); chosen.append((label, cand))
     options: List[TripOption] = []
     for label, c in chosen:
-        history = c["history"]
-        forecast = c["forecast"]
+        history, forecast = c["history"], c["forecast"]
         avg30 = statistics.mean(history)
-        # Recommendation logic: if current total < 95% of 30d avg => book_now (cheap)
-        # if forecast trends upward beyond +5% => book_now
         forecast_change = (forecast[-1] - c["total"]) / c["total"]
         if c["total"] < avg30 * 0.95 or forecast_change > 0.05:
             recommendation = "book_now"
@@ -418,53 +354,81 @@ def _optimise(req: OptimizeRequest) -> OptimizeResponse:
             recommendation = "book_now" if c["total"] <= mean_total else "wait"
             confidence = 65
             rationale = "Prices are stable. " + ("Solid value vs the search median." if recommendation == "book_now" else "Slightly above search median; you may find better.")
-
         savings = round(req.budget - c["total"], 2)
         if savings >= 0:
             headline = f"£{req.budget} budget → {c['dest']['city']} for £{int(round(c['total']))}. You save £{int(round(savings))}."
         else:
             headline = f"£{int(round(c['total']))} to {c['dest']['city']} · £{int(round(-savings))} over your £{req.budget} budget."
-
-        opt = TripOption(
-            id=str(uuid.uuid4()),
-            rank_label=label,
-            departure=req.departure,
-            departure_city=dep_meta["city"],
-            destination=c["dest"]["code"],
-            destination_city=c["dest"]["city"],
-            destination_country=c["dest"]["country"],
+        options.append(TripOption(
+            id=str(uuid.uuid4()), rank_label=label,
+            departure=req.departure, departure_city=dep_meta["city"],
+            destination=c["dest"]["code"], destination_city=c["dest"]["city"], destination_country=c["dest"]["country"],
             weather=c["dest"]["weather"],
-            check_in=c["check_in"].strftime("%Y-%m-%d"),
-            check_out=c["check_out"].strftime("%Y-%m-%d"),
-            nights=req.trip_length,
-            flight=c["flight"],
-            hotel=c["hotel"],
-            total_price=c["total"],
-            rating_score=round(c["value_score"], 1),
-            risk_score=c["risk_score"],
-            recommendation=recommendation,
-            confidence=confidence,
-            rationale=rationale,
-            headline=headline,
-            savings_vs_budget=savings,
+            check_in=c["check_in"].strftime("%Y-%m-%d"), check_out=c["check_out"].strftime("%Y-%m-%d"),
+            nights=req.trip_length, flight=c["flight"], hotel=c["hotel"],
+            total_price=c["total"], rating_score=round(c["value_score"], 1), risk_score=c["risk_score"],
+            recommendation=recommendation, confidence=confidence, rationale=rationale,
+            headline=headline, savings_vs_budget=savings,
             affiliate_flight_url=_affiliate_flight(req.departure, c["dest"]["code"], c["check_in"], c["check_out"]),
             affiliate_hotel_url=_affiliate_hotel(c["dest"]["city"], c["check_in"], c["check_out"]),
-            price_history=history,
-            price_forecast=forecast,
-        )
-        options.append(opt)
-
+            price_history=history, price_forecast=forecast,
+        ))
     return OptimizeResponse(
-        request_id=str(uuid.uuid4()),
-        generated_at=datetime.now(timezone.utc).isoformat(),
-        options=options,
-        searched_combinations=len(all_candidates),
-        median_total=median_total,
+        request_id=str(uuid.uuid4()), generated_at=datetime.now(timezone.utc).isoformat(),
+        options=options, searched_combinations=len(all_candidates), median_total=median_total,
     )
 
 
 # ---------------------------------------------------------------------------
-# Routes
+# Auth
+# ---------------------------------------------------------------------------
+async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Missing bearer token")
+    token = authorization.split(" ", 1)[1].strip()
+    session = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid session")
+    expires_at = session["expires_at"]
+    if isinstance(expires_at, str):
+        expires_at = datetime.fromisoformat(expires_at)
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=401, detail="Session expired")
+    user = await db.users.find_one({"user_id": session["user_id"]}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user
+
+
+def _user_to_model(user_doc: dict) -> User:
+    pro_until = user_doc.get("pro_until")
+    is_pro = False
+    pu_str = None
+    if pro_until:
+        if isinstance(pro_until, str):
+            dt = datetime.fromisoformat(pro_until)
+        else:
+            dt = pro_until
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        is_pro = dt > datetime.now(timezone.utc)
+        pu_str = dt.isoformat()
+    created = user_doc.get("created_at")
+    if isinstance(created, datetime):
+        created = created.isoformat()
+    return User(
+        user_id=user_doc["user_id"], email=user_doc["email"],
+        name=user_doc.get("name", user_doc["email"].split("@")[0]),
+        picture=user_doc.get("picture"),
+        pro_until=pu_str, is_pro=is_pro,
+        created_at=created or datetime.now(timezone.utc).isoformat(),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Routes — Public
 # ---------------------------------------------------------------------------
 @api.get("/")
 async def root():
@@ -485,52 +449,397 @@ async def destinations():
 async def optimize(req: OptimizeRequest):
     logger.info("Optimise request: %s", req.model_dump())
     result = _optimise(req)
-    # Persist the request for analytics (no PII)
     await db.optimisations.insert_one({
-        "request_id": result.request_id,
-        "request": req.model_dump(),
-        "generated_at": result.generated_at,
-        "median_total": result.median_total,
+        "request_id": result.request_id, "request": req.model_dump(),
+        "generated_at": result.generated_at, "median_total": result.median_total,
         "searched_combinations": result.searched_combinations,
     })
     return result
 
 
+# ---------------------------------------------------------------------------
+# Routes — Auth
+# ---------------------------------------------------------------------------
+class SessionExchangeRequest(BaseModel):
+    session_id: str
+
+
+@api.post("/auth/session")
+async def auth_session(req: SessionExchangeRequest):
+    """Exchange Emergent session_id for a persistent session_token."""
+    async with httpx.AsyncClient(timeout=15.0) as http:
+        try:
+            resp = await http.get(EMERGENT_AUTH_SESSION_DATA_URL, headers={"X-Session-ID": req.session_id})
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Auth provider unreachable: {e}")
+    if resp.status_code != 200:
+        raise HTTPException(status_code=401, detail=f"Auth exchange failed: {resp.text}")
+    data = resp.json()
+    email = data["email"]
+    existing = await db.users.find_one({"email": email}, {"_id": 0})
+    now = datetime.now(timezone.utc)
+    if existing:
+        user_id = existing["user_id"]
+        await db.users.update_one(
+            {"user_id": user_id},
+            {"$set": {"name": data.get("name", existing.get("name")),
+                      "picture": data.get("picture", existing.get("picture")),
+                      "last_login": now}},
+        )
+    else:
+        user_id = f"user_{uuid.uuid4().hex[:12]}"
+        await db.users.insert_one({
+            "user_id": user_id, "email": email,
+            "name": data.get("name", email.split("@")[0]),
+            "picture": data.get("picture"),
+            "pro_until": None,
+            "created_at": now, "last_login": now,
+        })
+    session_token = data["session_token"]
+    await db.user_sessions.insert_one({
+        "user_id": user_id, "session_token": session_token,
+        "expires_at": now + timedelta(days=7), "created_at": now,
+    })
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    return {"session_token": session_token, "user": _user_to_model(user_doc).model_dump()}
+
+
+@api.get("/auth/me", response_model=User)
+async def auth_me(user: dict = Depends(get_current_user)):
+    return _user_to_model(user)
+
+
+@api.post("/auth/logout")
+async def auth_logout(authorization: Optional[str] = Header(None)):
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+        await db.user_sessions.delete_one({"session_token": token})
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Routes — Saved trips (per-user) + Watch
+# ---------------------------------------------------------------------------
 @api.post("/trips/save", response_model=SavedTrip)
-async def save_trip(req: SaveTripRequest):
+async def save_trip(req: SaveTripRequest, user: dict = Depends(get_current_user)):
     saved = SavedTrip(
-        id=str(uuid.uuid4()),
+        id=str(uuid.uuid4()), user_id=user["user_id"],
         saved_at=datetime.now(timezone.utc).isoformat(),
-        trip=req.trip,
+        trip=req.trip, is_watching=False,
+        last_seen_total=req.trip.total_price,
+        last_seen_recommendation=req.trip.recommendation,
     )
     await db.saved_trips.insert_one(saved.model_dump())
     return saved
 
 
 @api.get("/trips", response_model=List[SavedTrip])
-async def list_trips():
-    docs = await db.saved_trips.find({}, {"_id": 0}).sort("saved_at", -1).to_list(200)
+async def list_trips(user: dict = Depends(get_current_user)):
+    docs = await db.saved_trips.find({"user_id": user["user_id"]}, {"_id": 0}).sort("saved_at", -1).to_list(200)
     return [SavedTrip(**d) for d in docs]
 
 
 @api.delete("/trips/{trip_id}")
-async def delete_trip(trip_id: str):
-    res = await db.saved_trips.delete_one({"id": trip_id})
+async def delete_trip(trip_id: str, user: dict = Depends(get_current_user)):
+    res = await db.saved_trips.delete_one({"id": trip_id, "user_id": user["user_id"]})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Saved trip not found")
     return {"deleted": trip_id}
 
 
+class WatchToggleRequest(BaseModel):
+    is_watching: bool
+
+
+@api.post("/trips/{trip_id}/watch")
+async def toggle_watch(trip_id: str, body: WatchToggleRequest, user: dict = Depends(get_current_user)):
+    trip = await db.saved_trips.find_one({"id": trip_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not trip:
+        raise HTTPException(status_code=404, detail="Saved trip not found")
+    if body.is_watching:
+        user_model = _user_to_model(user)
+        if not user_model.is_pro:
+            current_watching = await db.saved_trips.count_documents({
+                "user_id": user["user_id"], "is_watching": True, "id": {"$ne": trip_id}
+            })
+            if current_watching >= FREE_WATCH_LIMIT:
+                raise HTTPException(
+                    status_code=402,
+                    detail=f"Free tier allows {FREE_WATCH_LIMIT} watched trip. Upgrade to Pro for unlimited.",
+                )
+    await db.saved_trips.update_one(
+        {"id": trip_id, "user_id": user["user_id"]},
+        {"$set": {"is_watching": body.is_watching}},
+    )
+    return {"id": trip_id, "is_watching": body.is_watching}
+
+
+# ---------------------------------------------------------------------------
+# Routes — Stripe Pro paywall
+# ---------------------------------------------------------------------------
+def _build_origin_urls(origin_url: str) -> tuple[str, str]:
+    base = origin_url.rstrip("/")
+    success = f"{base}/upgrade?session_id={{CHECKOUT_SESSION_ID}}"
+    cancel = f"{base}/upgrade"
+    return success, cancel
+
+
+@api.post("/payments/checkout")
+async def create_checkout(req: CheckoutRequest, request: Request, user: dict = Depends(get_current_user)):
+    api_key = os.environ.get("STRIPE_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="Stripe not configured")
+    host_url = str(request.base_url).rstrip("/")
+    webhook_url = f"{host_url}/api/webhook/stripe"
+    stripe = StripeCheckout(api_key=api_key, webhook_url=webhook_url)
+    success_url, cancel_url = _build_origin_urls(req.origin_url)
+    metadata = {
+        "user_id": user["user_id"], "email": user["email"],
+        "product": "tripopt_pro_30d", "amount_gbp": str(PRO_PRICE_GBP),
+    }
+    checkout_req = CheckoutSessionRequest(
+        amount=float(PRO_PRICE_GBP), currency="gbp",
+        success_url=success_url, cancel_url=cancel_url, metadata=metadata,
+    )
+    session = await stripe.create_checkout_session(checkout_req)
+    await db.payment_transactions.insert_one({
+        "session_id": session.session_id, "user_id": user["user_id"],
+        "email": user["email"], "amount_gbp": PRO_PRICE_GBP, "currency": "gbp",
+        "metadata": metadata, "payment_status": "pending",
+        "status": "open", "credited": False,
+        "created_at": datetime.now(timezone.utc),
+    })
+    return {"url": session.url, "session_id": session.session_id}
+
+
+@api.get("/payments/status/{session_id}")
+async def payment_status(session_id: str, request: Request, user: dict = Depends(get_current_user)):
+    api_key = os.environ.get("STRIPE_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="Stripe not configured")
+    txn = await db.payment_transactions.find_one(
+        {"session_id": session_id, "user_id": user["user_id"]}, {"_id": 0}
+    )
+    if not txn:
+        raise HTTPException(status_code=404, detail="Payment session not found")
+    host_url = str(request.base_url).rstrip("/")
+    webhook_url = f"{host_url}/api/webhook/stripe"
+    stripe = StripeCheckout(api_key=api_key, webhook_url=webhook_url)
+    status_resp = await stripe.get_checkout_status(session_id)
+    new_status, new_payment = status_resp.status, status_resp.payment_status
+    update = {"$set": {"status": new_status, "payment_status": new_payment,
+                       "updated_at": datetime.now(timezone.utc)}}
+    pro_until_iso = None
+    if new_payment == "paid" and not txn.get("credited"):
+        new_pro_until = datetime.now(timezone.utc) + timedelta(days=PRO_DAYS)
+        existing_until = None
+        cur_user = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+        if cur_user and cur_user.get("pro_until"):
+            existing_until = cur_user["pro_until"]
+            if isinstance(existing_until, str):
+                existing_until = datetime.fromisoformat(existing_until)
+            if existing_until.tzinfo is None:
+                existing_until = existing_until.replace(tzinfo=timezone.utc)
+            if existing_until > datetime.now(timezone.utc):
+                new_pro_until = existing_until + timedelta(days=PRO_DAYS)
+        await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": {"pro_until": new_pro_until}},
+        )
+        update["$set"]["credited"] = True
+        update["$set"]["pro_until"] = new_pro_until
+        pro_until_iso = new_pro_until.isoformat()
+    await db.payment_transactions.update_one({"session_id": session_id}, update)
+    return {
+        "session_id": session_id, "status": new_status, "payment_status": new_payment,
+        "amount_total": status_resp.amount_total, "currency": status_resp.currency,
+        "credited": new_payment == "paid", "pro_until": pro_until_iso,
+    }
+
+
+@api.post("/webhook/stripe")
+async def stripe_webhook(request: Request):
+    api_key = os.environ.get("STRIPE_API_KEY")
+    if not api_key:
+        return {"ok": False, "reason": "stripe not configured"}
+    host_url = str(request.base_url).rstrip("/")
+    stripe = StripeCheckout(api_key=api_key, webhook_url=f"{host_url}/api/webhook/stripe")
+    body = await request.body()
+    sig = request.headers.get("Stripe-Signature", "")
+    try:
+        event = await stripe.handle_webhook(body, sig)
+    except Exception as e:
+        logger.warning("Webhook decode failed: %s", e)
+        return {"ok": False}
+    if event.payment_status == "paid":
+        meta = event.metadata or {}
+        user_id = meta.get("user_id")
+        if user_id:
+            txn = await db.payment_transactions.find_one(
+                {"session_id": event.session_id, "user_id": user_id}, {"_id": 0}
+            )
+            if txn and not txn.get("credited"):
+                new_pro_until = datetime.now(timezone.utc) + timedelta(days=PRO_DAYS)
+                cur_user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+                if cur_user and cur_user.get("pro_until"):
+                    eu = cur_user["pro_until"]
+                    if isinstance(eu, str):
+                        eu = datetime.fromisoformat(eu)
+                    if eu.tzinfo is None:
+                        eu = eu.replace(tzinfo=timezone.utc)
+                    if eu > datetime.now(timezone.utc):
+                        new_pro_until = eu + timedelta(days=PRO_DAYS)
+                await db.users.update_one(
+                    {"user_id": user_id}, {"$set": {"pro_until": new_pro_until}}
+                )
+                await db.payment_transactions.update_one(
+                    {"session_id": event.session_id},
+                    {"$set": {"credited": True, "payment_status": "paid",
+                              "pro_until": new_pro_until}},
+                )
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Routes — Push tokens
+# ---------------------------------------------------------------------------
+@api.post("/push/register")
+async def register_push(req: PushRegisterRequest, user: dict = Depends(get_current_user)):
+    await db.push_tokens.update_one(
+        {"user_id": user["user_id"], "expo_token": req.expo_token},
+        {"$set": {"user_id": user["user_id"], "expo_token": req.expo_token,
+                  "platform": req.platform, "active": True,
+                  "updated_at": datetime.now(timezone.utc)},
+         "$setOnInsert": {"created_at": datetime.now(timezone.utc)}},
+        upsert=True,
+    )
+    return {"ok": True}
+
+
+async def _send_expo_push(tokens: list[str], title: str, body: str, data: dict | None = None):
+    if not tokens:
+        return
+    payload = {"to": tokens, "sound": "default", "title": title, "body": body}
+    if data:
+        payload["data"] = data
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as http:
+            resp = await http.post(EXPO_PUSH_URL, json=payload,
+                                   headers={"Content-Type": "application/json"})
+            logger.info("Expo push response: %s", resp.status_code)
+    except Exception as e:
+        logger.warning("Expo push failed: %s", e)
+
+
+# ---------------------------------------------------------------------------
+# Routes — In-app alerts
+# ---------------------------------------------------------------------------
+@api.get("/notifications", response_model=List[Notification])
+async def list_notifications(user: dict = Depends(get_current_user)):
+    docs = await db.notifications.find({"user_id": user["user_id"]}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return [Notification(**d) for d in docs]
+
+
+@api.post("/notifications/{nid}/read")
+async def mark_read(nid: str, user: dict = Depends(get_current_user)):
+    res = await db.notifications.update_one(
+        {"id": nid, "user_id": user["user_id"]}, {"$set": {"read": True}}
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Background watcher
+# ---------------------------------------------------------------------------
+async def _record_alert(user_id: str, title: str, body: str, saved_trip_id: str, data: dict):
+    n = Notification(
+        id=str(uuid.uuid4()), user_id=user_id,
+        title=title, body=body, saved_trip_id=saved_trip_id, data=data,
+        created_at=datetime.now(timezone.utc).isoformat(), read=False,
+    )
+    await db.notifications.insert_one(n.model_dump())
+    push_docs = await db.push_tokens.find({"user_id": user_id, "active": True}, {"_id": 0}).to_list(20)
+    tokens = [d["expo_token"] for d in push_docs]
+    if tokens:
+        await _send_expo_push(tokens, title, body, data={"type": "price_alert", **data})
+
+
+async def check_watched_trips():
+    """Re-runs optimise on every watched trip and emits alerts on material changes."""
+    cursor = db.saved_trips.find({"is_watching": True}, {"_id": 0})
+    async for st in cursor:
+        try:
+            t = st["trip"]
+            req = OptimizeRequest(
+                departure=t["departure"], destination=t["destination"],
+                budget=int(round(t["total_price"] * 1.5)),
+                trip_length=t["nights"], flexibility_days=3,
+                weather="any", hotel_standard=t["hotel"]["standard"] if t["hotel"]["standard"] in ("budget", "mid") else "any",
+                start_window_days=30,
+            )
+            res = _optimise(req)
+            best = min(res.options, key=lambda o: o.total_price)
+            last_total = st.get("last_seen_total") or t["total_price"]
+            change_pct = (best.total_price - last_total) / last_total
+            new_reco = best.recommendation
+            old_reco = st.get("last_seen_recommendation") or t["recommendation"]
+            await db.saved_trips.update_one(
+                {"id": st["id"]},
+                {"$set": {"last_seen_total": best.total_price,
+                          "last_seen_recommendation": new_reco,
+                          "last_checked_at": datetime.now(timezone.utc)}},
+            )
+            triggered = False
+            if change_pct <= -0.05:
+                title = f"Price drop on your {t['destination_city']} trip"
+                body = f"£{int(round(last_total))} → £{int(round(best.total_price))} ({int(round(change_pct*100))}%). {best.recommendation.replace('_', ' ').title()}."
+                triggered = True
+            elif change_pct >= 0.07:
+                title = f"Prices rising for {t['destination_city']}"
+                body = f"£{int(round(last_total))} → £{int(round(best.total_price))} (+{int(round(change_pct*100))}%). {best.recommendation.replace('_', ' ').title()}."
+                triggered = True
+            elif new_reco != old_reco:
+                title = f"Recommendation changed: {t['destination_city']}"
+                body = f"Now {new_reco.replace('_', ' ')} at £{int(round(best.total_price))} ({best.confidence}% confidence)."
+                triggered = True
+            if triggered:
+                await _record_alert(st["user_id"], title, body, st["id"],
+                                    {"saved_trip_id": st["id"], "total": best.total_price})
+        except Exception as e:
+            logger.warning("Watcher failed for trip %s: %s", st.get("id"), e)
+
+
+@api.post("/_admin/run-watcher")
+async def run_watcher_now():
+    """Manual trigger for the price watcher (used by tests/cron)."""
+    await check_watched_trips()
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Wire up
+# ---------------------------------------------------------------------------
 app.include_router(api)
 app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    CORSMiddleware, allow_credentials=True, allow_origins=["*"],
+    allow_methods=["*"], allow_headers=["*"],
 )
+
+scheduler = AsyncIOScheduler()
+
+
+@app.on_event("startup")
+async def _startup():
+    scheduler.add_job(check_watched_trips, "interval", hours=6, id="watcher",
+                      next_run_time=datetime.now(timezone.utc) + timedelta(minutes=5))
+    scheduler.start()
+    logger.info("Scheduler started (price watcher every 6h)")
 
 
 @app.on_event("shutdown")
-async def shutdown_db_client():
+async def _shutdown():
+    if scheduler.running:
+        scheduler.shutdown(wait=False)
     client.close()

@@ -1,10 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Device from "expo-device";
+import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  Platform,
   ScrollView,
   Share,
   StyleSheet,
@@ -13,29 +16,58 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { api, type TripOption } from "../../src/api";
+import { api, type SavedTrip, type TripOption } from "../../src/api";
+import { useAuth } from "../../src/auth";
 import { colors, radii, spacing } from "../../src/theme";
 
 const ACTIVE_KEY = "tripopt:active_trip";
+const ACTIVE_SAVED_KEY = "tripopt:active_saved_id";
+
+async function registerPushIfPossible() {
+  try {
+    if (Platform.OS === "web") return; // not supported in web preview
+    if (!Device.isDevice) return;
+    const { status: existing } = await Notifications.getPermissionsAsync();
+    let final = existing;
+    if (existing !== "granted") {
+      const { status } = await Notifications.requestPermissionsAsync();
+      final = status;
+    }
+    if (final !== "granted") return;
+    const token = await Notifications.getExpoPushTokenAsync();
+    await api.registerPush(token.data, Platform.OS);
+  } catch (e) {
+    // best-effort; push isn't critical for in-app alerts
+    console.log("push register failed", e);
+  }
+}
 
 export default function TripDetail() {
   const router = useRouter();
+  const { user } = useAuth();
   const [trip, setTrip] = useState<TripOption | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState<SavedTrip | null>(null);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     (async () => {
       const raw = await AsyncStorage.getItem(ACTIVE_KEY);
       if (raw) setTrip(JSON.parse(raw));
+      const sid = await AsyncStorage.getItem(ACTIVE_SAVED_KEY);
+      if (sid && user) {
+        try {
+          const all = await api.listTrips();
+          const match = all.find((s) => s.id === sid);
+          if (match) setSaved(match);
+        } catch {}
+      }
     })();
-  }, []);
+  }, [user]);
 
   const series = useMemo(() => {
     if (!trip) return null;
     const all = [...trip.price_history, ...trip.price_forecast];
-    const min = Math.min(...all);
-    const max = Math.max(...all);
-    return { all, min, max, splitAt: trip.price_history.length };
+    return { all, min: Math.min(...all), max: Math.max(...all), splitAt: trip.price_history.length };
   }, [trip]);
 
   if (!trip) {
@@ -50,26 +82,63 @@ export default function TripDetail() {
   const open = (url: string) => WebBrowser.openBrowserAsync(url).catch(() => {});
 
   const onSave = async () => {
-    if (saving) return;
-    setSaving(true);
+    if (busy) return;
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+    setBusy(true);
     try {
-      await api.saveTrip(trip);
-      Alert.alert("Saved", "Trip added to your saved list.");
+      const result = await api.saveTrip(trip);
+      setSaved(result);
+      await AsyncStorage.setItem(ACTIVE_SAVED_KEY, result.id);
+      Alert.alert("Saved", "Trip added. Toggle Watch to get price alerts.");
     } catch (e: any) {
       Alert.alert("Could not save", e.message ?? "Try again");
     } finally {
-      setSaving(false);
+      setBusy(false);
+    }
+  };
+
+  const onToggleWatch = async () => {
+    if (!user) { router.push("/login"); return; }
+    if (!saved) {
+      // Save first, then enable watch
+      await onSave();
+      return;
+    }
+    setBusy(true);
+    try {
+      const next = !saved.is_watching;
+      const res = await api.toggleWatch(saved.id, next);
+      setSaved({ ...saved, is_watching: res.is_watching });
+      if (res.is_watching) {
+        registerPushIfPossible();
+        Alert.alert("Watching", "We'll alert you when prices drop or the recommendation changes.");
+      }
+    } catch (e: any) {
+      const msg = e?.message ?? "";
+      if (msg.includes("402")) {
+        Alert.alert(
+          "Pro required",
+          "Free tier watches 1 trip. Upgrade to Pro to watch unlimited trips.",
+          [
+            { text: "Not now", style: "cancel" },
+            { text: "Upgrade", onPress: () => router.push("/upgrade") },
+          ]
+        );
+      } else {
+        Alert.alert("Could not update watch", msg);
+      }
+    } finally {
+      setBusy(false);
     }
   };
 
   const onShare = async () => {
     if (!trip) return;
     const message = `${trip.headline} ${trip.nights} nights · ${fmtRange(trip.check_in, trip.check_out)} · ${trip.flight.airline} + ${trip.hotel.name}. Found with TripOpt.`;
-    try {
-      await Share.share({ message, title: "My TripOpt deal" });
-    } catch (_) {
-      // user cancelled
-    }
+    try { await Share.share({ message, title: "My TripOpt deal" }); } catch {}
   };
 
   return (
@@ -96,15 +165,27 @@ export default function TripDetail() {
           <Ionicons name="share-outline" size={20} color={colors.ink} />
         </TouchableOpacity>
         <TouchableOpacity
-          testID="save-trip-btn"
-          onPress={onSave}
-          style={styles.iconBtn}
-          disabled={saving}
+          testID="watch-trip-btn"
+          onPress={onToggleWatch}
+          style={[styles.iconBtn, saved?.is_watching && styles.iconBtnActive]}
+          disabled={busy}
         >
           <Ionicons
-            name={saving ? "hourglass-outline" : "bookmark-outline"}
+            name={saved?.is_watching ? "eye" : "eye-outline"}
             size={20}
-            color={colors.ink}
+            color={saved?.is_watching ? "#fff" : colors.ink}
+          />
+        </TouchableOpacity>
+        <TouchableOpacity
+          testID="save-trip-btn"
+          onPress={onSave}
+          style={[styles.iconBtn, saved && styles.iconBtnActive]}
+          disabled={busy}
+        >
+          <Ionicons
+            name={saved ? "bookmark" : "bookmark-outline"}
+            size={20}
+            color={saved ? "#fff" : colors.ink}
           />
         </TouchableOpacity>
       </View>
@@ -306,6 +387,10 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  iconBtnActive: {
+    backgroundColor: colors.ink,
+    borderColor: colors.ink,
   },
   headerEyebrow: {
     fontSize: 10,
