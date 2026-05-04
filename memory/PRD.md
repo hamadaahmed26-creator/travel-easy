@@ -1,70 +1,66 @@
-# TripOpt — Total Trip Optimiser + Pro Mode
+# TripOpt — Total Trip Optimiser + Pro Mode + Global Airports
 
 ## Vision
-A travel app that optimises an *entire* trip (flights + hotels + timing) like a financial portfolio. Type a budget, tap "Anywhere", and TripOpt returns the best possible full trip you can buy for that money — with a Book-now-vs-Wait recommendation and confidence score. **Pro Mode** lets users watch saved trips so the optimiser re-runs in the background and pings them when prices move or the recommendation flips.
+A travel app that optimises whole trips like a financial portfolio. Pick **any city** worldwide → any other city → "What can I get for £X?" Returns 3 ranked trips (Cheapest / Best Value / Lowest Risk), Book-now-vs-Wait recommendation, and Pro-Mode price-watching with alerts.
 
 ## Stack
-- **Frontend:** React Native (Expo SDK 54) + Expo Router, react-native-reanimated, AsyncStorage 2.2.0, expo-web-browser, expo-notifications, native `Share`.
-- **Backend:** FastAPI + Motor + MongoDB + APScheduler (background watcher) + emergentintegrations (Stripe one-time checkout) + httpx (Emergent OAuth + Expo Push). Single-file `server.py`.
-- **Auth:** Emergent-managed Google OAuth (session_token Bearer header).
-- **Payments:** Stripe via `emergentintegrations.payments.stripe.checkout.StripeCheckout` (key `sk_test_emergent`).
-- **Push:** Expo hosted push service (`exp.host/--/api/v2/push/send`); registration always works, delivery requires native dev build (Expo Go on Android dropped push in SDK 53+).
+- **Frontend:** React Native (Expo SDK 54) + Expo Router · AsyncStorage · expo-web-browser · expo-notifications · react-native-reanimated · native Share
+- **Backend:** FastAPI · Motor + MongoDB · APScheduler (price watcher every 6h) · emergentintegrations (Stripe one-time) · httpx (Emergent OAuth + Expo Push + OurAirports) · Pydantic
+- **Auth:** Emergent-managed Google OAuth
+- **Payments:** Stripe (£2.99 = 30 days of Pro, repeatable)
+- **Push:** Expo hosted push service
+- **Airports DB:** **OurAirports CC0** (~4,441 medium+large IATA airports, ~1,177 large-airport destinations) cached on disk at `/app/backend/data/airports_cache.json`
 
 ## Endpoints
 **Public**
-- `GET /api/airports`, `GET /api/destinations`, `POST /api/optimize`
-- `POST /api/auth/session` (exchange Emergent session_id → session_token)
-- `POST /api/webhook/stripe`
+- `GET /api/airports` — curated popular departures (~95 hubs)
+- `GET /api/destinations` — curated popular destinations
+- `GET /api/airports/search?q=...&limit=...` — fuzzy live search across IATA / city / country / country-name / airport-name
+- `POST /api/optimize` — runs portfolio optimisation
+- `POST /api/auth/session` (exchange Emergent session_id), `POST /api/webhook/stripe`
 
-**Auth-required (Bearer)**
+**Auth-required**
 - `GET /api/auth/me`, `POST /api/auth/logout`
-- `GET /api/trips`, `POST /api/trips/save`, `DELETE /api/trips/{id}`
-- `POST /api/trips/{id}/watch` (toggle; returns 402 for free tier > 1 watch)
-- `POST /api/payments/checkout`, `GET /api/payments/status/{sid}` (poll)
+- `GET /api/trips`, `POST /api/trips/save`, `DELETE /api/trips/{id}`, `POST /api/trips/{id}/watch`
+- `POST /api/payments/checkout`, `GET /api/payments/status/{sid}`
 - `POST /api/push/register`
 - `GET /api/notifications`, `POST /api/notifications/{id}/read`
-- `POST /api/_admin/run-watcher` (manual trigger)
+- `POST /api/_admin/run-watcher` (manual scheduler trigger)
 
 ## Screens
-- `/` — Search (budget chips, Anywhere highlight, login + alerts icons)
+- `/` — Search (budget chips, Anywhere highlight, **typeahead picker** with auto-focus + Recent + debounced live search)
 - `/loading` — Dark Swiss optimisation loader
-- `/results` — Verdict banner + 3 ranked trip cards (savings chips)
-- `/trip/[id]` — Breakdown, sparkline, Save / Watch / Share / Book-Flight / Book-Hotel
-- `/saved` — Per-user saved trips, Watch toggles, Pro upgrade banner, logout
+- `/results` — Verdict banner + 3 ranked trip cards with savings chips
+- `/trip/[id]` — Full breakdown, sparkline, Save/Watch/Share/Book-Flight/Book-Hotel
+- `/saved` — Per-user saved trips, watch toggles, Pro upgrade banner, logout
 - `/alerts` — In-app price-alert inbox
-- `/login` — Google one-tap (Emergent OAuth)
-- `/upgrade` — Stripe checkout (£2.99 = 30 days of Pro)
+- `/login` — Emergent Google OAuth
+- `/upgrade` — Stripe checkout (£2.99 = 30 days)
 
 ## Algorithm
-- For each (destination, date in flexibility window) — generate seeded flight + hotel — compute total. Rank Cheapest / Best Value / Lowest Risk.
-- 30d simulated history + 14d forecast → Book-now if total < 95% avg or forecast +5% rising; Wait if elevated and falling.
-- Headline: `£500 budget → Palma de Mallorca for £375. You save £125.`
-- Background watcher re-runs optimisation on every watched trip every 6h. Triggers alert if price drops ≥5%, rises ≥7%, or recommendation flips.
+1. For each (destination, date in flexibility window): generate seeded flight (haversine-distance-based) + hotel + score.
+2. Cheapest = min total · Best Value = max(rating·100/(total/100) − distance·2 − stops·5) · Lowest Risk = min volatility×200 + max(0, trend)×100
+3. 30d simulated history + 14d forecast → Book-now if total < 95% avg or +5% rising; Wait if elevated and falling.
+4. Headline: `£500 budget → Palma de Mallorca for £375. You save £125.`
+5. Background watcher re-runs optimisation on every watched trip every 6h. Triggers alert if price drops ≥5%, rises ≥7%, or recommendation flips.
 
 ## MongoDB collections
-- `users` (user_id, email, name, picture, pro_until)
-- `user_sessions` (user_id, session_token, expires_at)
-- `saved_trips` (user_id, trip, is_watching, last_seen_total, last_seen_recommendation)
-- `notifications` (user_id, title, body, saved_trip_id, read)
-- `push_tokens` (user_id, expo_token, platform, active)
-- `payment_transactions` (session_id, user_id, payment_status, credited, pro_until)
-- `optimisations` (search analytics)
+`users`, `user_sessions`, `saved_trips`, `notifications`, `push_tokens`, `payment_transactions`, `optimisations`
 
 ## Pro Tier
-- Free: 1 watched trip
-- Pro: unlimited watches, real price alerts (in-app + push), early deal access (£2.99 / 30d, repeatable)
+- Free: 1 watched trip · Pro: unlimited + push + early deal access (£2.99 / 30d)
 
 ## Mocked / Stubbed
-- Flight + hotel pricing: deterministic seeded mock (no Skyscanner/Booking.com APIs)
+- Flight + hotel pricing: deterministic seeded mock with **haversine-distance-based base** (LHR→Paris ~£100–250, LHR→Tokyo ~£900–1300, NRT→LAX ~£974)
 - Affiliate URLs: generic Skyscanner / Booking.com search URLs (no affiliate ID yet)
-- Push delivery: registration is real; actual Expo push delivery requires a native build (Expo Go limitation)
+- Push delivery requires a native build (Expo Go limitation)
 
 ## Tested
-- 23/23 backend pytest tests pass (auth, scoping, watch limit, watcher, Stripe, push, notifications + 9 regression for the v1 MVP)
-- Frontend E2E verified: viral search flow (£500 → Anywhere), login screen, upgrade screen with £2.99 hero, alerts inbox, saved screen with watch toggles + Pro banner, unauth save → redirect to /login
+- Backend: 36/39 pytest pass (3 minor pre-existing test-data allowlist issues unrelated to this iteration)
+- Frontend: 13/13 iter-7 features verified by testing agent (typeahead picker, Recent chips, no-results, search by 'saudi'/'jed'/'lagos'/'vietnam', full optimise flow, Pro Mode, login, paywall)
 
-## Next steps
-1. Real Skyscanner / Amadeus + Booking.com / RapidAPI integrations (single `_optimise()` swap)
-2. Plug in affiliate IDs for revenue
+## What's left
+1. Real Skyscanner / Amadeus / Booking APIs (single `_optimise()` swap)
+2. Affiliate IDs in `_affiliate_flight()` / `_affiliate_hotel()` for revenue
 3. Native dev build to enable real push delivery
-4. Polish: pull-to-refresh, profile page, deep-linking from notifications on cold start
+4. Pull-to-refresh, profile screen, deep-linking from notifications on cold start

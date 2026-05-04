@@ -314,13 +314,21 @@ def _optimise(req: OptimizeRequest) -> OptimizeResponse:
     if not dep_meta:
         raise HTTPException(status_code=400, detail=f"Unknown departure airport {req.departure}")
     if req.destination:
+        if req.destination == req.departure:
+            raise HTTPException(status_code=400, detail="Destination must differ from departure")
         dests = [d for d in DESTINATIONS if d["code"] == req.destination]
         if not dests:
             raise HTTPException(status_code=400, detail=f"Unknown destination {req.destination}")
     else:
         # "Anywhere" — exclude same airport / same city as the departure.
         dep_meta_full = _airport(req.departure)
-        dests = [d for d in DESTINATIONS if d["code"] != req.departure and d["city"] != dep_meta_full["city"]]
+        def _norm_city(s: str) -> str:
+            return (s or "").split("(")[0].strip().lower()
+        dep_city_norm = _norm_city(dep_meta_full.get("city", "")) if dep_meta_full else ""
+        dests = [
+            d for d in DESTINATIONS
+            if d["code"] != req.departure and _norm_city(d["city"]) != dep_city_norm
+        ]
     if req.weather != "any":
         dests = [d for d in dests if d["weather"] == req.weather or d["weather"] == "both"]
     all_candidates = []
