@@ -1,0 +1,70 @@
+{
+  "summary": "Iteration 6 — global airports + typeahead. Backend: 22/23 tests pass (popular lists, JED/Lagos/Hanoi search, empty-q fallback, limit, JED→Anywhere optimise with ~1177 dest pool, all iter 1-5 regressions: auth/me, watch limit 402, watcher alerts, Stripe checkout, push register). 1 backend bug: q=saudi returns 0 results because dataset stores ISO-2 codes ('SA') only, no full country name. FRONTEND: BROKEN — /app/frontend/app/index.tsx has a fatal SyntaxError at line 762 (duplicated stylesheet block after closing `});`) and undefined symbols `useRef`, `loadRecent`, `pushRecent`, `RECENT_DEP_KEY`, `RECENT_DEST_KEY`. Web preview returns 500 'Server Error — Missing semicolon (762:19)'. No frontend flow could be tested.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "GET /api/airports/search?q=saudi",
+        "issue": "Returns empty set. Search matches against country ISO-2 ('SA') only; full country names like 'saudi' / 'saudi arabia' / 'united arab emirates' / 'south korea' / 'vietnam' never match. User-stated requirement explicitly expects q=saudi → JED, RUH, etc. Fix: enrich each airport row with a country_name (from a name map or by reverse-lookup), or extend the search loop to also test the country full name from a code→name map.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "app/index.tsx",
+        "issue": "Fatal compile error: stylesheet block at lines 761-774 is leftover/duplicated AFTER the closing `});` of StyleSheet.create on line 760. Web preview shows 500 Server Error: 'SyntaxError: Missing semicolon (762:19)'. App cannot load at all.",
+        "testID": "n/a",
+        "priority": "CRITICAL"
+      },
+      {
+        "component": "app/index.tsx",
+        "issue": "`useRef` is used at lines 46-47 but NOT imported. Import line 4 only has useCallback, useEffect, useMemo, useState. Will throw ReferenceError once the syntax error is fixed.",
+        "testID": "picker-search",
+        "priority": "CRITICAL"
+      },
+      {
+        "component": "app/index.tsx",
+        "issue": "`loadRecent`, `pushRecent`, `RECENT_DEP_KEY`, `RECENT_DEST_KEY` referenced at lines 57-58, 426-431, 452-457 but defined nowhere (no import, no local declaration). grep across /app/frontend/src confirms zero matches. Recent-chip persistence (AsyncStorage) is unimplemented.",
+        "testID": "recent-JED",
+        "priority": "CRITICAL"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "All frontend flows (FROM picker open, typeahead search, recent chips, no-results, optimise end-to-end)",
+        "issue": "Cannot exercise any of them — the entry screen fails to bundle. UI testing fully blocked until the three bugs above are fixed.",
+        "affected_testIDs": ["departure-input", "destination-input", "picker-search", "picker-item-JED", "recent-JED", "picker-no-results", "optimise-btn"]
+      }
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_airports_search.py",
+    "/app/backend/tests/test_pro_mode.py",
+    "/app/test_reports/pytest/iter6.xml"
+  ],
+  "action_items": [
+    "FRONTEND CRITICAL — /app/frontend/app/index.tsx line ~760: delete the duplicated stylesheet remnant lines 761-774 (everything between the first `});` closing StyleSheet.create and the second `});`). The legitimate StyleSheet.create ends at line 760.",
+    "FRONTEND CRITICAL — add `useRef` to the react import in /app/frontend/app/index.tsx (line 4): `import { useCallback, useEffect, useMemo, useRef, useState } from 'react';`",
+    "FRONTEND CRITICAL — implement (or import) `loadRecent`, `pushRecent`, `RECENT_DEP_KEY`, `RECENT_DEST_KEY`. Suggested impl in /app/frontend/src/recent.ts using AsyncStorage with keys `tripopt:recent_departures` and `tripopt:recent_destinations`, capped at 5 entries — exactly per the agent-to-agent context note.",
+    "BACKEND HIGH — make /api/airports/search match full country names. Either enrich each airport with `country_name` (e.g., import pycountry or extend COUNTRY_NAMES map in airport_data.py to cover all ISO-2 codes used and add `name = COUNTRY_NAMES.get(country, country)` into the row, then include it in the search loop), or, in server.py search_airports, build a code→full-name map and check `query in country_full_name`."
+  ],
+  "critical_code_review_comments": [
+    "Frontend index.tsx is now 760+ lines — getting close to the 700-line split threshold. The picker modal + Recent storage is a natural candidate for extraction into /app/frontend/src/components/AirportPicker.tsx.",
+    "Backend airport search loops over all 4441 airports per request. Acceptable today but at >50 req/s consider an in-memory inverted index keyed by lowercased code/city/country tokens.",
+    "POPULAR_DEPARTURES contains 'CGK' but the curated list comment says ~80-100; current count (counted manually) is ~95 — within range, fine.",
+    "Search scoring gives no weight to large vs medium airports until a tie — fine, already +5 bonus when is_large."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_airports_search.py (NEW)"
+  ],
+  "success_rate": {"backend": "95.7% (22/23)", "frontend": "0% (app fails to bundle)"},
+  "seed_data_creation": "test_pro_mode.py seeds users + sessions + saved trips inline via Mongo and tears them down per-class. No persistent seed data left behind.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Once E1 fixes the 3 frontend bugs (delete dup stylesheet, import useRef, implement RECENT_*/loadRecent/pushRecent), re-run the playwright flow: open FROM picker → assert auto-focus on picker-search → type 'jed' → click picker-item-JED → reopen FROM → assert recent-JED visible → type 'xxxyyy' → assert picker-no-results visible → close picker → click optimise-btn with budget 500/Anywhere → expect 3 result cards. Backend search bug (q=saudi) needs a separate fix before its test can be re-enabled.",
+  "rca_of_issue": "Frontend SyntaxError RCA: when the StyleSheet.create block was edited, an old fragment of the previous styles (starting at `nItems: 'center'`) was left in place after the new closing `});`. JS parser sees `});` at line 760, then `nItems` on line 761 as a top-level statement → 'Missing semicolon'. Reproduce: open https://smart-travel-deals-4.preview.emergentagent.com on mobile viewport — Metro/Expo serves the red error overlay instead of the app. Mitigation: remove lines 761-774 entirely; the stylesheet that ends at line 760 is the correct/complete one. Backend 'saudi' search RCA: airport_data.py line 120 stores `country = iso_country.upper()` (ISO-2). server.py search_airports.py only checks `country.startswith(query)` / `query in country` against this 2-char code, so 'saudi' (5 chars) can never match. Mitigation: add a country_name field at enrich time using a complete ISO-2→name map (pycountry or hand-rolled) and include it in the score loop."
+}

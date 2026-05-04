@@ -99,6 +99,8 @@ async function request<T>(path: string, init?: RequestInit & { auth?: boolean })
 export const api = {
   airports: () => request<{ airports: Airport[] }>("/airports", { auth: false }),
   destinations: () => request<{ destinations: Destination[] }>("/destinations", { auth: false }),
+  searchAirports: (q: string, limit = 40) =>
+    request<{ results: Airport[] }>(`/airports/search?q=${encodeURIComponent(q)}&limit=${limit}`, { auth: false }),
   optimize: (body: OptimizeRequest) =>
     request<OptimizeResponse>("/optimize", { method: "POST", body: JSON.stringify(body), auth: false }),
   // Auth

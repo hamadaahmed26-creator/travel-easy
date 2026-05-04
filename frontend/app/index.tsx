@@ -39,20 +39,67 @@ export default function SearchScreen() {
   const [hotelPref, setHotelPref] = useState<HotelPref>("any");
   const [pickerOpen, setPickerOpen] = useState<null | "departure" | "destination">(null);
   const [pickerSearch, setPickerSearch] = useState("");
+  const [pickerResults, setPickerResults] = useState<Airport[]>([]);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [recentDep, setRecentDep] = useState<string[]>([]);
+  const [recentDest, setRecentDest] = useState<string[]>([]);
+  const searchInputRef = useRef<TextInput>(null);
+  const debounceRef = useRef<any>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const [a, d] = await Promise.all([api.airports(), api.destinations()]);
+        const [a, d, rDep, rDest] = await Promise.all([
+          api.airports(),
+          api.destinations(),
+          loadRecent(RECENT_DEP_KEY),
+          loadRecent(RECENT_DEST_KEY),
+        ]);
         setAirports(a.airports);
         setDestinations(d.destinations);
+        setRecentDep(rDep);
+        setRecentDest(rDest);
       } catch (e: any) {
         setError(e.message ?? "Failed to load");
       }
     })();
   }, []);
+
+  // Live debounced search whenever the picker query changes.
+  useEffect(() => {
+    if (pickerOpen === null) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const q = pickerSearch.trim();
+    if (!q) {
+      // Show curated/popular set when empty
+      setPickerResults(pickerOpen === "departure" ? airports : destinations);
+      setPickerLoading(false);
+      return;
+    }
+    setPickerLoading(true);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await api.searchAirports(q, 50);
+        setPickerResults(res.results);
+      } catch {
+        // ignore — keep last results
+      } finally {
+        setPickerLoading(false);
+      }
+    }, 200);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [pickerSearch, pickerOpen, airports, destinations]);
+
+  // Autofocus the search input the moment the picker opens.
+  useEffect(() => {
+    if (pickerOpen === null) return;
+    const t = setTimeout(() => searchInputRef.current?.focus(), 150);
+    return () => clearTimeout(t);
+  }, [pickerOpen]);
 
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
@@ -96,28 +143,7 @@ export default function SearchScreen() {
     }
   };
 
-  const filteredPickerData = useMemo(() => {
-    const q = pickerSearch.trim().toLowerCase();
-    if (pickerOpen === "departure") {
-      return airports.filter(
-        (a) =>
-          !q ||
-          a.city.toLowerCase().includes(q) ||
-          a.code.toLowerCase().includes(q) ||
-          a.name.toLowerCase().includes(q)
-      );
-    }
-    if (pickerOpen === "destination") {
-      return destinations.filter(
-        (d) =>
-          !q ||
-          d.city.toLowerCase().includes(q) ||
-          d.country.toLowerCase().includes(q) ||
-          d.code.toLowerCase().includes(q)
-      );
-    }
-    return [];
-  }, [pickerOpen, pickerSearch, airports, destinations]);
+  const filteredPickerData = pickerResults;
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
@@ -355,14 +381,20 @@ export default function SearchScreen() {
                 </TouchableOpacity>
               </View>
               <TextInput
+                ref={searchInputRef}
                 testID="picker-search"
                 style={styles.search}
-                placeholder="Search city or code"
+                placeholder={pickerOpen === "departure" ? "Search city, country or IATA…" : "Search destination, country or IATA…"}
                 placeholderTextColor={colors.inkMuted}
                 value={pickerSearch}
                 onChangeText={setPickerSearch}
-                autoCapitalize="characters"
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="search"
               />
+              {pickerLoading && pickerSearch.length > 0 ? (
+                <Text style={styles.searchHint}>Searching…</Text>
+              ) : null}
               {pickerOpen === "destination" && (
                 <TouchableOpacity
                   testID="anywhere-option"
@@ -383,13 +415,47 @@ export default function SearchScreen() {
                 data={filteredPickerData}
                 keyExtractor={(item: any) => item.code}
                 keyboardShouldPersistTaps="handled"
+                ListHeaderComponent={
+                  pickerSearch.trim().length === 0 ? (
+                    <RecentRow
+                      codes={pickerOpen === "departure" ? recentDep : recentDest}
+                      airportsByCode={pickerResults}
+                      onPick={async (code) => {
+                        if (pickerOpen === "departure") {
+                          setDeparture(code);
+                          await pushRecent(RECENT_DEP_KEY, code);
+                          setRecentDep(await loadRecent(RECENT_DEP_KEY));
+                        } else {
+                          setDestination(code);
+                          await pushRecent(RECENT_DEST_KEY, code);
+                          setRecentDest(await loadRecent(RECENT_DEST_KEY));
+                        }
+                        setPickerOpen(null);
+                      }}
+                    />
+                  ) : null
+                }
+                ListEmptyComponent={
+                  pickerLoading ? null : (
+                    <Text style={styles.noResults} testID="picker-no-results">
+                      No airports match "{pickerSearch}". Try a different city, country, or 3-letter IATA code.
+                    </Text>
+                  )
+                }
                 renderItem={({ item }: any) => (
                   <TouchableOpacity
                     testID={`picker-item-${item.code}`}
                     style={styles.pickerRow}
-                    onPress={() => {
-                      if (pickerOpen === "departure") setDeparture(item.code);
-                      else setDestination(item.code);
+                    onPress={async () => {
+                      if (pickerOpen === "departure") {
+                        setDeparture(item.code);
+                        await pushRecent(RECENT_DEP_KEY, item.code);
+                        setRecentDep(await loadRecent(RECENT_DEP_KEY));
+                      } else {
+                        setDestination(item.code);
+                        await pushRecent(RECENT_DEST_KEY, item.code);
+                        setRecentDest(await loadRecent(RECENT_DEST_KEY));
+                      }
                       setPickerOpen(null);
                     }}
                   >
@@ -399,9 +465,7 @@ export default function SearchScreen() {
                         {item.country ? `, ${item.country}` : ""}
                       </Text>
                       <Text style={styles.pickerSub}>
-                        {pickerOpen === "departure"
-                          ? `${item.name}${item.country ? ` · ${item.country}` : ""}`
-                          : `${item.weather === "sun" ? "🌞" : item.weather === "city" ? "🏛" : "🌍"} ${item.region}`}
+                        {item.name || (item as any).region || ""}
                       </Text>
                     </View>
                     <Text style={styles.pickerCode}>{item.code}</Text>
@@ -418,6 +482,41 @@ export default function SearchScreen() {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return <Text style={styles.fieldLabel}>{children}</Text>;
+}
+
+function RecentRow({
+  codes,
+  airportsByCode,
+  onPick,
+}: {
+  codes: string[];
+  airportsByCode: Airport[];
+  onPick: (code: string) => void;
+}) {
+  if (!codes.length) return null;
+  // Resolve codes to airports from the current pool (popular set when empty query).
+  const byCode: Record<string, Airport> = {};
+  for (const a of airportsByCode) byCode[a.code] = a;
+  const items = codes.map((c) => byCode[c]).filter(Boolean) as Airport[];
+  if (!items.length) return null;
+  return (
+    <View style={styles.recentBox} testID="picker-recent-row">
+      <Text style={styles.recentTitle}>RECENT</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm }}>
+        {items.map((a) => (
+          <TouchableOpacity
+            key={a.code}
+            testID={`recent-${a.code}`}
+            style={styles.recentChip}
+            onPress={() => onPick(a.code)}
+          >
+            <Text style={styles.recentChipCode}>{a.code}</Text>
+            <Text style={styles.recentChipCity} numberOfLines={1}>{a.city}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
 }
 
 function ChipRow<T>({
@@ -646,6 +745,20 @@ const styles = StyleSheet.create({
   pickerRow: {
     flexDirection: "row",
     alignItems: "center",
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  pickerCity: { fontSize: 15, fontWeight: "700", color: colors.ink },
+  pickerSub: { fontSize: 12, color: colors.inkMuted, marginTop: 2 },
+  pickerCode: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: colors.brand,
+    letterSpacing: 1,
+  },
+});
+nItems: "center",
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
