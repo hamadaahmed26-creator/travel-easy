@@ -1,0 +1,84 @@
+{
+  "theme": "Light",
+  "archetype": "Archetype 4 (Swiss & High-Contrast)",
+  "domain": "Travel optimization mobile app (React Native Expo)",
+  "design_philosophy": "Fintech-meets-travel. Treat travel optimization like a financial portfolio. Total trip price is the hero metric. Avoid generic travel-app tropes (big landscape photos as primary content). Treat it as a data-driven decision engine.",
+  "colors": {
+    "background_primary": "#FFFFFF",
+    "background_secondary": "#F8FAFC",
+    "surface": "#FFFFFF",
+    "text_primary": "#0A0A0A",
+    "text_secondary": "#64748B",
+    "text_muted": "#94A3B8",
+    "brand_primary": "#0F172A", 
+    "semantic_buy": "#059669", 
+    "semantic_buy_bg": "#D1FAE5",
+    "semantic_wait": "#EA580C",
+    "semantic_wait_bg": "#FFEDD5",
+    "semantic_risk_low": "#2563EB",
+    "border": "#E2E8F0"
+  },
+  "typography": {
+    "strategy": "Swiss Brutalist (Tech/Art): Use Cabinet Grotesk for strong, architectural headings and tabular numbers. Use IBM Plex Sans for legible, dense body data.",
+    "heading_font": "Cabinet Grotesk",
+    "body_font": "IBM Plex Sans",
+    "scales": {
+      "h1": "text-4xl tracking-tighter font-black text-slate-950",
+      "h2": "text-2xl tracking-tight font-bold text-slate-900",
+      "h3": "text-xl font-bold text-slate-900",
+      "hero_metric": "text-5xl tracking-tighter font-black tabular-nums text-slate-950",
+      "body": "text-base text-slate-700",
+      "caption": "text-xs tracking-widest uppercase font-bold text-slate-500"
+    }
+  },
+  "spacing": {
+    "screen_padding": "p-4",
+    "card_padding": "p-5",
+    "gap_small": "gap-2",
+    "gap_medium": "gap-4",
+    "gap_large": "gap-8"
+  },
+  "layout_strategy": {
+    "general": "Mobile-first, dense and scannable. Utilize 'The Control Room' grid mentality.",
+    "cards": "Subtle roundness (rounded-2xl). Flat background, 1px subtle border (border-slate-200), minimal shadow. No soft UI/Neumorphism."
+  },
+  "screens": {
+    "search": {
+      "layout": "Simple, focused homepage. Large, thumb-friendly inputs (h-14). Use Bottom Sheets for date flexibility and 'Anywhere' selections. A prominent, high-contrast primary CTA.",
+      "components": ["departure_airport_input", "budget_slider", "destination_selector", "flexibility_toggle", "weather_hotel_preferences"]
+    },
+    "loading": {
+      "layout": "Fullscreen immersive state.",
+      "animation_concept": "Engaging 'intelligent optimisation in progress'. Dark background with rapid data-scrubbing number animations, cycling text ('Optimising your trip...', 'Calculating flight volatility...', 'Scoring hotel value...', 'Building trip portfolio...'). Creates perceived intelligence."
+    },
+    "results": {
+      "layout": "Vertical scroll list of 3 ranked Trip Cards (Cheapest, Best Value, Lowest Risk).",
+      "trip_card_blueprint": {
+        "header": "Row: Ranking Label (e.g. 'Cheapest') on left, small square destination thumbnail (e.g. 48x48) on right.",
+        "hero": "Massive total combined price (e.g. '£349') taking up 30-40% of vertical space, using tabular numbers.",
+        "details": "Two distinct rows or bento-style sections for Flight (airline, times, tiny icon) and Hotel (name, stars, distance).",
+        "action_row": "Book now vs Wait badge taking precedence. Includes confidence score (e.g., 'Book Now - 92% Confidence')."
+      }
+    },
+    "detail": {
+      "layout": "Scrollable breakdown.",
+      "components": {
+        "price_prediction": "Simple line chart visual (using a charting library) showing historical/predicted price trend to justify the 'Wait/Buy' recommendation.",
+        "itinerary": "Timeline-style breakdown of flight legs and hotel stay.",
+        "ctas": "Sticky bottom bar with affiliate 'Book Flight' and 'Book Hotel' split buttons."
+      }
+    }
+  },
+  "media": {
+    "image_urls": {
+      "destination_paris": "https://images.unsplash.com/photo-1568586762506-8aec6f40aef4?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTV8MHwxfHNlYXJjaHwyfHxwYXJpcyUyMGNpdHklMjBkYXl8ZW58MHx8fHwxNzc3ODU4NTg1fDA&ixlib=rb-4.1.0&q=85",
+      "destination_bali": "https://images.unsplash.com/photo-1729606559533-c36af0b1bafe?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njl8MHwxfHNlYXJjaHwzfHxiYWxpJTIwYmVhY2glMjByZXNvcnQlMjBzdW58ZW58MHx8fHwxNzc3ODU4NTg1fDA&ixlib=rb-4.1.0&q=85",
+      "destination_city": "https://images.unsplash.com/photo-1683574543558-faf3a2192718?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTV8MHwxfHNlYXJjaHwxfHxwYXJpcyUyMGNpdHklMjBkYXl8ZW58MHx8fHwxNzc3ODU4NTg1fDA&ixlib=rb-4.1.0&q=85"
+    },
+    "instructions_to_main_agent": "Use these images STRICTLY for small destination thumbnails (e.g. 48x48 or 64x64) in the results and detail screens. Do NOT use them as full-bleed hero backgrounds."
+  },
+  "accessibility_and_testing": {
+    "data_testid_rules": "All interactive and key informational elements MUST include a data-testid attribute. Convention: kebab-case, role-based (e.g., data-testid='trip-card-price', data-testid='book-now-button', data-testid='budget-input').",
+    "motion": "Use react-native-reanimated for smooth transitions but respect prefers-reduced-motion where applicable."
+  }
+}
