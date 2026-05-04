@@ -137,7 +137,7 @@ export default function SearchScreen() {
               </Text>
               <Text style={styles.title} testID="screen-title">Optimise the whole trip.</Text>
               <Text style={styles.subtitle}>
-                Flights, hotels, dates — ranked like a portfolio. Cheapest combined cost wins.
+                Any city → any city, ranked like a portfolio. Cheapest combined cost wins.
               </Text>
             </View>
             <View style={{ flexDirection: "row", gap: spacing.sm }}>
@@ -328,8 +328,9 @@ export default function SearchScreen() {
           </TouchableOpacity>
 
           <Text style={styles.disclaimer}>
-            TripOpt searches flights + hotels across your flexibility window and
-            ranks the best combined-price trips. Affiliate links open the booking site.
+            TripOpt searches flights + hotels across 80+ airports in your flexibility window
+            and ranks the best combined-price trips. Prices shown are realistic estimates;
+            affiliate links open the live booking site.
           </Text>
         </ScrollView>
 
@@ -398,7 +399,9 @@ export default function SearchScreen() {
                         {item.country ? `, ${item.country}` : ""}
                       </Text>
                       <Text style={styles.pickerSub}>
-                        {pickerOpen === "departure" ? item.name : `Avg flight £${item.base_flight * 2}`}
+                        {pickerOpen === "departure"
+                          ? `${item.name}${item.country ? ` · ${item.country}` : ""}`
+                          : `${item.weather === "sun" ? "🌞" : item.weather === "city" ? "🏛" : "🌍"} ${item.region}`}
                       </Text>
                     </View>
                     <Text style={styles.pickerCode}>{item.code}</Text>

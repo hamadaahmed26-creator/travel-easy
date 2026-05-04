@@ -53,11 +53,38 @@ class TestReferenceData:
         assert "destinations" in data
         assert len(data["destinations"]) >= 10
         sample = data["destinations"][0]
-        assert {"code", "city", "country", "weather", "base_flight", "base_hotel", "volatility"} <= set(
-            sample.keys()
-        )
+        # Iteration 5: base_flight removed (now derived from haversine).
+        assert {"code", "city", "country", "weather", "base_hotel", "volatility",
+                "lat", "lng", "region"} <= set(sample.keys())
         weathers = {d["weather"] for d in data["destinations"]}
         assert weathers <= {"sun", "city", "both"}
+
+    # --- Iteration 5: global dataset expansion -------------------------------
+    def test_airports_global_dataset_count_and_non_uk(self, api):
+        r = api.get(f"{BASE_URL}/api/airports", timeout=30)
+        assert r.status_code == 200
+        airports = r.json()["airports"]
+        assert len(airports) >= 80, f"expected 80+ airports, got {len(airports)}"
+        codes = {a["code"] for a in airports}
+        # Non-UK departures must exist
+        for code in ("JFK", "LAX", "NRT", "HND", "SYD", "GRU", "DXB", "JNB"):
+            assert code in codes, f"missing global airport {code}"
+        # Every airport has lat/lng/region/country
+        for a in airports:
+            assert {"code", "city", "country", "name", "lat", "lng", "region"} <= set(a.keys())
+            assert isinstance(a["lat"], (int, float))
+            assert isinstance(a["lng"], (int, float))
+        regions = {a["region"] for a in airports}
+        assert {"EU", "NA", "AS", "OC", "AF", "SA", "ME"} <= regions
+
+    def test_destinations_global_dataset(self, api):
+        r = api.get(f"{BASE_URL}/api/destinations", timeout=30)
+        assert r.status_code == 200
+        dests = r.json()["destinations"]
+        assert len(dests) >= 70, f"expected 70+ destinations, got {len(dests)}"
+        codes = {d["code"] for d in dests}
+        for code in ("HND", "BKK", "SYD", "CPT", "DPS", "GIG"):
+            assert code in codes, f"missing global destination {code}"
 
 
 # --- optimizer ---------------------------------------------------------------
@@ -179,6 +206,86 @@ class TestOptimize:
             assert "over your £200 budget" in o["headline"].lower(), o["headline"]
             # negative savings means total > budget
             assert o["total_price"] > 200
+
+
+# --- Iteration 5: global departures + haversine pricing ---------------------
+class TestGlobalRouting:
+    def test_optimize_jfk_anywhere_returns_three_options(self, api):
+        payload = {
+            "departure": "JFK", "destination": None,
+            "budget": 1000, "trip_length": 5, "flexibility_days": 3,
+            "weather": "any", "hotel_standard": "any", "start_window_days": 30,
+        }
+        r = api.post(f"{BASE_URL}/api/optimize", json=payload, timeout=60)
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert len(body["options"]) == 3
+        for o in body["options"]:
+            assert o["departure"] == "JFK"
+            assert o["destination"] != "JFK"  # anywhere must exclude same airport
+            assert o["total_price"] > 0
+
+    def test_optimize_long_haul_lhr_to_hnd(self, api):
+        payload = {
+            "departure": "LHR", "destination": "HND",
+            "budget": 1500, "trip_length": 7, "flexibility_days": 3,
+            "weather": "any", "hotel_standard": "any", "start_window_days": 30,
+        }
+        r = api.post(f"{BASE_URL}/api/optimize", json=payload, timeout=60)
+        assert r.status_code == 200, r.text
+        opts = r.json()["options"]
+        # Long-haul LHR→HND should produce realistic flight price >= £900
+        for o in opts:
+            assert o["destination"] == "HND"
+            assert o["flight"]["price"] >= 900, (
+                f"long-haul flight too cheap: {o['flight']['price']}"
+            )
+
+    def test_optimize_short_haul_lhr_to_cdg(self, api):
+        payload = {
+            "departure": "LHR", "destination": "CDG",
+            "budget": 500, "trip_length": 3, "flexibility_days": 3,
+            "weather": "any", "hotel_standard": "any", "start_window_days": 30,
+        }
+        r = api.post(f"{BASE_URL}/api/optimize", json=payload, timeout=60)
+        assert r.status_code == 200, r.text
+        opts = r.json()["options"]
+        for o in opts:
+            assert o["destination"] == "CDG"
+            assert o["flight"]["price"] <= 250, (
+                f"short-haul too expensive: {o['flight']['price']}"
+            )
+
+    def test_optimize_syd_anywhere_excludes_sydney(self, api):
+        payload = {
+            "departure": "SYD", "destination": None,
+            "budget": 2000, "trip_length": 7, "flexibility_days": 3,
+            "weather": "sun", "hotel_standard": "any", "start_window_days": 30,
+        }
+        r = api.post(f"{BASE_URL}/api/optimize", json=payload, timeout=60)
+        assert r.status_code == 200, r.text
+        opts = r.json()["options"]
+        assert len(opts) == 3
+        for o in opts:
+            assert o["departure"] == "SYD"
+            assert o["destination"] != "SYD"
+            assert o["destination_city"] != "Sydney"
+
+    def test_optimize_same_airport_rejected_or_excluded(self, api):
+        # destination=departure should either be rejected or yield no same-city result
+        payload = {
+            "departure": "LHR", "destination": "LHR",
+            "budget": 500, "trip_length": 3, "flexibility_days": 3,
+            "weather": "any", "hotel_standard": "any", "start_window_days": 30,
+        }
+        r = api.post(f"{BASE_URL}/api/optimize", json=payload, timeout=30)
+        if r.status_code == 200:
+            # If accepted, the destination's city must NOT equal the departure city
+            for o in r.json()["options"]:
+                assert o["destination"] != "LHR"
+                assert o["destination_city"] != o["departure_city"]
+        else:
+            assert r.status_code in (400, 404, 422), (r.status_code, r.text)
 
 
 # --- saved trips — now auth-gated; covered in test_pro_mode.py --------------

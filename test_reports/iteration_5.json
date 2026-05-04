@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 5 (global dataset expansion) verified end-to-end. Backend pytest 30/30 green: 4 NEW reference-data tests confirm 87 airports incl. JFK/LAX/NRT/HND/SYD/GRU/DXB/JNB with lat/lng/region and 71 destinations incl. HND/BKK/SYD/CPT/DPS/GIG; 5 NEW global-routing tests confirm JFK→Anywhere returns 3 options excluding JFK, LHR→HND long-haul flight.price >= £900, LHR→CDG short-haul flight.price <= £250, SYD→Anywhere(weather=sun) excludes Sydney/SYD, and LHR→LHR same-airport is rejected/excluded. Stale `base_flight` field assertion in test_destinations_returns_list updated to reflect haversine-derived pricing (now requires lat/lng/region). All previously-passing tests (Pro Mode auth, watch-limit 402, scheduler, Stripe checkout, push register, in-app alerts, headline/savings) still pass. Frontend mobile-viewport smoke (375x667): home loads with subtitle 'Any city → any city, ranked like a portfolio.' ✓, disclaimer mentions '80+ airports' ✓, FROM picker contains JFK and SYD (non-UK departures), TO picker contains HND/BKK/SYD/CPT/DPS (global destinations). Picker search filters correctly.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      { "screen": "/ (home)", "issues": ["Stale fallback copy: index.tsx line ~184 still shows 'UK departure' as the FROM field hint when departureMeta is undefined (first paint before /api/airports resolves). With BRS as default, real users rarely see it, but the iteration 5 narrative is global-first — recommend changing to 'Any departure airport' or similar."] }
+    ],
+    "react_native_issues": [
+      { "component": "multiple", "issue": "`props.pointerEvents is deprecated. Use style.pointerEvents` warning still logs (carryover from iter 3/4). Non-blocking." }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_tripopt_api.py",
+    "/app/backend/tests/test_pro_mode.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Optional: replace the 'UK departure' fallback copy in /app/frontend/app/index.tsx (line ~184) with neutral 'Any departure airport' to match the global-first iteration 5 messaging.",
+    "Optional: silence pointerEvents deprecation warnings (carryover)."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 1037 lines now — splitting into routers (auth, trips, payments, push, watcher, optimize) is increasingly worth doing.",
+    "Duplicate code in _hotel_price (lines 407-409): the function body is repeated twice — the second `rng = ...; return ...` block is dead code after the first return. Harmless but should be cleaned up.",
+    "_route_base_flight returns 80.0 fallback when departure or destination airport is unknown; OptimizeRequest already validates departure (HTTPException 400) and destination is constrained to DESTINATIONS — so this fallback is unreachable in practice but worth either removing or asserting.",
+    "Same-airport guard in _optimise (line 499) only excludes by `code` and `city` — works for the LHR/LGW/STN London cluster but relies on city-string equality (e.g., NRT vs HND both have city='Tokyo' so a Tokyo→Anywhere search correctly drops both)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_tripopt_api.py (added TestGlobalRouting class with 5 iter-5 tests; updated test_destinations_returns_list to drop obsolete base_flight field and require lat/lng/region; added test_airports_global_dataset_count_and_non_uk and test_destinations_global_dataset under TestReferenceData)"
+  ],
+  "success_rate": { "backend": "100% (30/30)", "frontend": "100% (smoke: subtitle + disclaimer + global pickers all verified)" },
+  "seed_data_creation": "No new seed required. test_pro_mode.py fixtures continue to seed/teardown TEST_* users+sessions.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iteration 5 expanded UK_AIRPORTS to 87 entries spanning EU/NA/SA/ME/AS/AF/OC and DESTINATIONS to 71. Pricing now derived via _route_base_flight() haversine (1000km≈£75, 5000km≈£230, 9000km≈£375, 16000km≈£580, +18% if regions differ). Destination model lost `base_flight` — anything in tests still asserting that field will break. Same-airport / same-city is excluded from Anywhere via dep_meta_full city match (line 499). Frontend default departure remains BRS but FROM picker exposes all 87."
+}

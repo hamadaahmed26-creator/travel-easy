@@ -52,35 +52,190 @@ PRO_DAYS = 30
 FREE_WATCH_LIMIT = 1
 
 UK_AIRPORTS = [
-    {"code": "LHR", "city": "London", "name": "Heathrow"},
-    {"code": "LGW", "city": "London", "name": "Gatwick"},
-    {"code": "STN", "city": "London", "name": "Stansted"},
-    {"code": "LTN", "city": "London", "name": "Luton"},
-    {"code": "BRS", "city": "Bristol", "name": "Bristol"},
-    {"code": "MAN", "city": "Manchester", "name": "Manchester"},
-    {"code": "BHX", "city": "Birmingham", "name": "Birmingham"},
-    {"code": "EDI", "city": "Edinburgh", "name": "Edinburgh"},
-    {"code": "GLA", "city": "Glasgow", "name": "Glasgow"},
-    {"code": "LPL", "city": "Liverpool", "name": "Liverpool"},
+    # Europe — UK & Ireland
+    {"code": "LHR", "city": "London", "country": "United Kingdom", "name": "Heathrow", "lat": 51.47, "lng": -0.45, "region": "EU"},
+    {"code": "LGW", "city": "London", "country": "United Kingdom", "name": "Gatwick", "lat": 51.15, "lng": -0.18, "region": "EU"},
+    {"code": "STN", "city": "London", "country": "United Kingdom", "name": "Stansted", "lat": 51.88, "lng": 0.23, "region": "EU"},
+    {"code": "LTN", "city": "London", "country": "United Kingdom", "name": "Luton", "lat": 51.87, "lng": -0.37, "region": "EU"},
+    {"code": "BRS", "city": "Bristol", "country": "United Kingdom", "name": "Bristol", "lat": 51.38, "lng": -2.72, "region": "EU"},
+    {"code": "MAN", "city": "Manchester", "country": "United Kingdom", "name": "Manchester", "lat": 53.36, "lng": -2.27, "region": "EU"},
+    {"code": "BHX", "city": "Birmingham", "country": "United Kingdom", "name": "Birmingham", "lat": 52.45, "lng": -1.74, "region": "EU"},
+    {"code": "EDI", "city": "Edinburgh", "country": "United Kingdom", "name": "Edinburgh", "lat": 55.95, "lng": -3.37, "region": "EU"},
+    {"code": "GLA", "city": "Glasgow", "country": "United Kingdom", "name": "Glasgow", "lat": 55.87, "lng": -4.43, "region": "EU"},
+    {"code": "LPL", "city": "Liverpool", "country": "United Kingdom", "name": "Liverpool", "lat": 53.33, "lng": -2.85, "region": "EU"},
+    {"code": "DUB", "city": "Dublin", "country": "Ireland", "name": "Dublin", "lat": 53.43, "lng": -6.25, "region": "EU"},
+    # Europe — Continental
+    {"code": "CDG", "city": "Paris", "country": "France", "name": "Charles de Gaulle", "lat": 49.01, "lng": 2.55, "region": "EU"},
+    {"code": "ORY", "city": "Paris", "country": "France", "name": "Orly", "lat": 48.72, "lng": 2.38, "region": "EU"},
+    {"code": "AMS", "city": "Amsterdam", "country": "Netherlands", "name": "Schiphol", "lat": 52.31, "lng": 4.76, "region": "EU"},
+    {"code": "FRA", "city": "Frankfurt", "country": "Germany", "name": "Frankfurt", "lat": 50.04, "lng": 8.55, "region": "EU"},
+    {"code": "MUC", "city": "Munich", "country": "Germany", "name": "Munich", "lat": 48.35, "lng": 11.79, "region": "EU"},
+    {"code": "BER", "city": "Berlin", "country": "Germany", "name": "Brandenburg", "lat": 52.36, "lng": 13.50, "region": "EU"},
+    {"code": "BCN", "city": "Barcelona", "country": "Spain", "name": "El Prat", "lat": 41.30, "lng": 2.08, "region": "EU"},
+    {"code": "MAD", "city": "Madrid", "country": "Spain", "name": "Barajas", "lat": 40.49, "lng": -3.57, "region": "EU"},
+    {"code": "AGP", "city": "Malaga", "country": "Spain", "name": "Costa del Sol", "lat": 36.67, "lng": -4.50, "region": "EU"},
+    {"code": "PMI", "city": "Palma de Mallorca", "country": "Spain", "name": "Palma", "lat": 39.55, "lng": 2.74, "region": "EU"},
+    {"code": "FAO", "city": "Faro", "country": "Portugal", "name": "Faro", "lat": 37.01, "lng": -7.97, "region": "EU"},
+    {"code": "LIS", "city": "Lisbon", "country": "Portugal", "name": "Humberto Delgado", "lat": 38.78, "lng": -9.13, "region": "EU"},
+    {"code": "FCO", "city": "Rome", "country": "Italy", "name": "Fiumicino", "lat": 41.80, "lng": 12.25, "region": "EU"},
+    {"code": "MXP", "city": "Milan", "country": "Italy", "name": "Malpensa", "lat": 45.63, "lng": 8.73, "region": "EU"},
+    {"code": "VCE", "city": "Venice", "country": "Italy", "name": "Marco Polo", "lat": 45.50, "lng": 12.35, "region": "EU"},
+    {"code": "ATH", "city": "Athens", "country": "Greece", "name": "Eleftherios Venizelos", "lat": 37.94, "lng": 23.94, "region": "EU"},
+    {"code": "JTR", "city": "Santorini", "country": "Greece", "name": "Santorini", "lat": 36.40, "lng": 25.48, "region": "EU"},
+    {"code": "PRG", "city": "Prague", "country": "Czechia", "name": "Václav Havel", "lat": 50.10, "lng": 14.26, "region": "EU"},
+    {"code": "BUD", "city": "Budapest", "country": "Hungary", "name": "Ferenc Liszt", "lat": 47.44, "lng": 19.26, "region": "EU"},
+    {"code": "VIE", "city": "Vienna", "country": "Austria", "name": "Vienna", "lat": 48.11, "lng": 16.57, "region": "EU"},
+    {"code": "ZRH", "city": "Zurich", "country": "Switzerland", "name": "Kloten", "lat": 47.46, "lng": 8.55, "region": "EU"},
+    {"code": "CPH", "city": "Copenhagen", "country": "Denmark", "name": "Kastrup", "lat": 55.62, "lng": 12.65, "region": "EU"},
+    {"code": "ARN", "city": "Stockholm", "country": "Sweden", "name": "Arlanda", "lat": 59.65, "lng": 17.92, "region": "EU"},
+    {"code": "OSL", "city": "Oslo", "country": "Norway", "name": "Gardermoen", "lat": 60.19, "lng": 11.10, "region": "EU"},
+    {"code": "HEL", "city": "Helsinki", "country": "Finland", "name": "Vantaa", "lat": 60.32, "lng": 24.96, "region": "EU"},
+    {"code": "KEF", "city": "Reykjavik", "country": "Iceland", "name": "Keflavik", "lat": 63.99, "lng": -22.61, "region": "EU"},
+    {"code": "WAW", "city": "Warsaw", "country": "Poland", "name": "Chopin", "lat": 52.17, "lng": 20.97, "region": "EU"},
+    {"code": "DBV", "city": "Dubrovnik", "country": "Croatia", "name": "Dubrovnik", "lat": 42.56, "lng": 18.27, "region": "EU"},
+    {"code": "IST", "city": "Istanbul", "country": "Turkey", "name": "Istanbul", "lat": 41.27, "lng": 28.74, "region": "EU"},
+    {"code": "TFS", "city": "Tenerife", "country": "Spain", "name": "Tenerife South", "lat": 28.04, "lng": -16.57, "region": "EU"},
+    # North America
+    {"code": "JFK", "city": "New York", "country": "United States", "name": "John F. Kennedy", "lat": 40.64, "lng": -73.78, "region": "NA"},
+    {"code": "LGA", "city": "New York", "country": "United States", "name": "LaGuardia", "lat": 40.78, "lng": -73.87, "region": "NA"},
+    {"code": "EWR", "city": "Newark", "country": "United States", "name": "Liberty", "lat": 40.69, "lng": -74.17, "region": "NA"},
+    {"code": "LAX", "city": "Los Angeles", "country": "United States", "name": "Los Angeles", "lat": 33.94, "lng": -118.41, "region": "NA"},
+    {"code": "SFO", "city": "San Francisco", "country": "United States", "name": "SFO", "lat": 37.62, "lng": -122.38, "region": "NA"},
+    {"code": "ORD", "city": "Chicago", "country": "United States", "name": "O'Hare", "lat": 41.98, "lng": -87.90, "region": "NA"},
+    {"code": "MIA", "city": "Miami", "country": "United States", "name": "Miami", "lat": 25.79, "lng": -80.29, "region": "NA"},
+    {"code": "BOS", "city": "Boston", "country": "United States", "name": "Logan", "lat": 42.36, "lng": -71.01, "region": "NA"},
+    {"code": "SEA", "city": "Seattle", "country": "United States", "name": "Sea-Tac", "lat": 47.45, "lng": -122.31, "region": "NA"},
+    {"code": "ATL", "city": "Atlanta", "country": "United States", "name": "Hartsfield-Jackson", "lat": 33.64, "lng": -84.43, "region": "NA"},
+    {"code": "DFW", "city": "Dallas", "country": "United States", "name": "DFW", "lat": 32.90, "lng": -97.04, "region": "NA"},
+    {"code": "LAS", "city": "Las Vegas", "country": "United States", "name": "Harry Reid", "lat": 36.08, "lng": -115.15, "region": "NA"},
+    {"code": "YYZ", "city": "Toronto", "country": "Canada", "name": "Pearson", "lat": 43.68, "lng": -79.63, "region": "NA"},
+    {"code": "YVR", "city": "Vancouver", "country": "Canada", "name": "Vancouver", "lat": 49.19, "lng": -123.18, "region": "NA"},
+    {"code": "MEX", "city": "Mexico City", "country": "Mexico", "name": "Benito Juárez", "lat": 19.44, "lng": -99.07, "region": "NA"},
+    {"code": "CUN", "city": "Cancún", "country": "Mexico", "name": "Cancún", "lat": 21.04, "lng": -86.87, "region": "NA"},
+    # South America
+    {"code": "GRU", "city": "São Paulo", "country": "Brazil", "name": "Guarulhos", "lat": -23.43, "lng": -46.47, "region": "SA"},
+    {"code": "GIG", "city": "Rio de Janeiro", "country": "Brazil", "name": "Galeão", "lat": -22.81, "lng": -43.25, "region": "SA"},
+    {"code": "EZE", "city": "Buenos Aires", "country": "Argentina", "name": "Ezeiza", "lat": -34.82, "lng": -58.54, "region": "SA"},
+    {"code": "LIM", "city": "Lima", "country": "Peru", "name": "Jorge Chávez", "lat": -12.02, "lng": -77.11, "region": "SA"},
+    {"code": "BOG", "city": "Bogotá", "country": "Colombia", "name": "El Dorado", "lat": 4.70, "lng": -74.14, "region": "SA"},
+    # Asia
+    {"code": "DXB", "city": "Dubai", "country": "United Arab Emirates", "name": "Dubai International", "lat": 25.25, "lng": 55.36, "region": "ME"},
+    {"code": "DOH", "city": "Doha", "country": "Qatar", "name": "Hamad", "lat": 25.27, "lng": 51.61, "region": "ME"},
+    {"code": "TLV", "city": "Tel Aviv", "country": "Israel", "name": "Ben Gurion", "lat": 32.01, "lng": 34.89, "region": "ME"},
+    {"code": "SIN", "city": "Singapore", "country": "Singapore", "name": "Changi", "lat": 1.36, "lng": 103.99, "region": "AS"},
+    {"code": "BKK", "city": "Bangkok", "country": "Thailand", "name": "Suvarnabhumi", "lat": 13.69, "lng": 100.75, "region": "AS"},
+    {"code": "HKT", "city": "Phuket", "country": "Thailand", "name": "Phuket", "lat": 8.11, "lng": 98.32, "region": "AS"},
+    {"code": "HND", "city": "Tokyo", "country": "Japan", "name": "Haneda", "lat": 35.55, "lng": 139.78, "region": "AS"},
+    {"code": "NRT", "city": "Tokyo", "country": "Japan", "name": "Narita", "lat": 35.77, "lng": 140.39, "region": "AS"},
+    {"code": "ICN", "city": "Seoul", "country": "South Korea", "name": "Incheon", "lat": 37.46, "lng": 126.44, "region": "AS"},
+    {"code": "PEK", "city": "Beijing", "country": "China", "name": "Capital", "lat": 40.08, "lng": 116.59, "region": "AS"},
+    {"code": "PVG", "city": "Shanghai", "country": "China", "name": "Pudong", "lat": 31.14, "lng": 121.81, "region": "AS"},
+    {"code": "HKG", "city": "Hong Kong", "country": "China", "name": "Chek Lap Kok", "lat": 22.31, "lng": 113.92, "region": "AS"},
+    {"code": "DEL", "city": "Delhi", "country": "India", "name": "Indira Gandhi", "lat": 28.56, "lng": 77.10, "region": "AS"},
+    {"code": "BOM", "city": "Mumbai", "country": "India", "name": "Chhatrapati Shivaji", "lat": 19.09, "lng": 72.87, "region": "AS"},
+    {"code": "DPS", "city": "Bali", "country": "Indonesia", "name": "Ngurah Rai", "lat": -8.75, "lng": 115.17, "region": "AS"},
+    {"code": "KUL", "city": "Kuala Lumpur", "country": "Malaysia", "name": "KLIA", "lat": 2.74, "lng": 101.71, "region": "AS"},
+    {"code": "MNL", "city": "Manila", "country": "Philippines", "name": "Ninoy Aquino", "lat": 14.51, "lng": 121.02, "region": "AS"},
+    # Africa
+    {"code": "CAI", "city": "Cairo", "country": "Egypt", "name": "Cairo", "lat": 30.11, "lng": 31.40, "region": "AF"},
+    {"code": "RAK", "city": "Marrakech", "country": "Morocco", "name": "Menara", "lat": 31.61, "lng": -8.04, "region": "AF"},
+    {"code": "JNB", "city": "Johannesburg", "country": "South Africa", "name": "OR Tambo", "lat": -26.13, "lng": 28.24, "region": "AF"},
+    {"code": "CPT", "city": "Cape Town", "country": "South Africa", "name": "Cape Town", "lat": -33.97, "lng": 18.60, "region": "AF"},
+    {"code": "NBO", "city": "Nairobi", "country": "Kenya", "name": "Jomo Kenyatta", "lat": -1.32, "lng": 36.93, "region": "AF"},
+    # Oceania
+    {"code": "SYD", "city": "Sydney", "country": "Australia", "name": "Kingsford Smith", "lat": -33.94, "lng": 151.18, "region": "OC"},
+    {"code": "MEL", "city": "Melbourne", "country": "Australia", "name": "Tullamarine", "lat": -37.67, "lng": 144.84, "region": "OC"},
+    {"code": "AKL", "city": "Auckland", "country": "New Zealand", "name": "Auckland", "lat": -37.01, "lng": 174.79, "region": "OC"},
 ]
 
+
+# Per-destination character: weather + intrinsic hotel rate + volatility.
+# Anywhere in the dataset can be used as either departure or destination, but
+# the optimiser ranks DESTINATIONS using these traits.
 DESTINATIONS = [
-    {"code": "BCN", "city": "Barcelona", "country": "Spain", "weather": "both", "base_flight": 95, "base_hotel": 85, "volatility": 0.18},
-    {"code": "AGP", "city": "Malaga", "country": "Spain", "weather": "sun", "base_flight": 80, "base_hotel": 70, "volatility": 0.22},
-    {"code": "PMI", "city": "Palma de Mallorca", "country": "Spain", "weather": "sun", "base_flight": 90, "base_hotel": 78, "volatility": 0.25},
-    {"code": "FAO", "city": "Faro", "country": "Portugal", "weather": "sun", "base_flight": 110, "base_hotel": 75, "volatility": 0.20},
-    {"code": "LIS", "city": "Lisbon", "country": "Portugal", "weather": "both", "base_flight": 120, "base_hotel": 90, "volatility": 0.15},
-    {"code": "CDG", "city": "Paris", "country": "France", "weather": "city", "base_flight": 75, "base_hotel": 130, "volatility": 0.12},
-    {"code": "FCO", "city": "Rome", "country": "Italy", "weather": "city", "base_flight": 105, "base_hotel": 110, "volatility": 0.16},
-    {"code": "VCE", "city": "Venice", "country": "Italy", "weather": "city", "base_flight": 130, "base_hotel": 140, "volatility": 0.20},
-    {"code": "ATH", "city": "Athens", "country": "Greece", "weather": "both", "base_flight": 140, "base_hotel": 80, "volatility": 0.17},
-    {"code": "JTR", "city": "Santorini", "country": "Greece", "weather": "sun", "base_flight": 180, "base_hotel": 160, "volatility": 0.30},
-    {"code": "AMS", "city": "Amsterdam", "country": "Netherlands", "weather": "city", "base_flight": 70, "base_hotel": 145, "volatility": 0.10},
-    {"code": "PRG", "city": "Prague", "country": "Czechia", "weather": "city", "base_flight": 95, "base_hotel": 75, "volatility": 0.13},
-    {"code": "BUD", "city": "Budapest", "country": "Hungary", "weather": "city", "base_flight": 100, "base_hotel": 65, "volatility": 0.14},
-    {"code": "IST", "city": "Istanbul", "country": "Turkey", "weather": "both", "base_flight": 160, "base_hotel": 70, "volatility": 0.22},
-    {"code": "DBV", "city": "Dubrovnik", "country": "Croatia", "weather": "sun", "base_flight": 145, "base_hotel": 100, "volatility": 0.24},
-    {"code": "TFS", "city": "Tenerife", "country": "Spain", "weather": "sun", "base_flight": 130, "base_hotel": 85, "volatility": 0.19},
+    {"code": a["code"], "city": a["city"], "country": a["country"],
+     "weather": w, "base_hotel": h, "volatility": v,
+     "lat": a["lat"], "lng": a["lng"], "region": a["region"]}
+    for a, w, h, v in [
+        # Europe / sun
+        (next(x for x in UK_AIRPORTS if x["code"] == "BCN"), "both", 85, 0.18),
+        (next(x for x in UK_AIRPORTS if x["code"] == "AGP"), "sun", 70, 0.22),
+        (next(x for x in UK_AIRPORTS if x["code"] == "PMI"), "sun", 78, 0.25),
+        (next(x for x in UK_AIRPORTS if x["code"] == "FAO"), "sun", 75, 0.20),
+        (next(x for x in UK_AIRPORTS if x["code"] == "LIS"), "both", 90, 0.15),
+        (next(x for x in UK_AIRPORTS if x["code"] == "MAD"), "city", 105, 0.13),
+        (next(x for x in UK_AIRPORTS if x["code"] == "CDG"), "city", 130, 0.12),
+        (next(x for x in UK_AIRPORTS if x["code"] == "AMS"), "city", 145, 0.10),
+        (next(x for x in UK_AIRPORTS if x["code"] == "FRA"), "city", 120, 0.11),
+        (next(x for x in UK_AIRPORTS if x["code"] == "MUC"), "city", 130, 0.12),
+        (next(x for x in UK_AIRPORTS if x["code"] == "BER"), "city", 110, 0.13),
+        (next(x for x in UK_AIRPORTS if x["code"] == "FCO"), "city", 110, 0.16),
+        (next(x for x in UK_AIRPORTS if x["code"] == "MXP"), "city", 125, 0.14),
+        (next(x for x in UK_AIRPORTS if x["code"] == "VCE"), "city", 140, 0.20),
+        (next(x for x in UK_AIRPORTS if x["code"] == "ATH"), "both", 80, 0.17),
+        (next(x for x in UK_AIRPORTS if x["code"] == "JTR"), "sun", 160, 0.30),
+        (next(x for x in UK_AIRPORTS if x["code"] == "PRG"), "city", 75, 0.13),
+        (next(x for x in UK_AIRPORTS if x["code"] == "BUD"), "city", 65, 0.14),
+        (next(x for x in UK_AIRPORTS if x["code"] == "VIE"), "city", 115, 0.11),
+        (next(x for x in UK_AIRPORTS if x["code"] == "ZRH"), "city", 175, 0.10),
+        (next(x for x in UK_AIRPORTS if x["code"] == "CPH"), "city", 145, 0.10),
+        (next(x for x in UK_AIRPORTS if x["code"] == "ARN"), "city", 140, 0.11),
+        (next(x for x in UK_AIRPORTS if x["code"] == "OSL"), "city", 165, 0.10),
+        (next(x for x in UK_AIRPORTS if x["code"] == "HEL"), "city", 130, 0.11),
+        (next(x for x in UK_AIRPORTS if x["code"] == "KEF"), "city", 155, 0.18),
+        (next(x for x in UK_AIRPORTS if x["code"] == "WAW"), "city", 70, 0.13),
+        (next(x for x in UK_AIRPORTS if x["code"] == "DBV"), "sun", 100, 0.24),
+        (next(x for x in UK_AIRPORTS if x["code"] == "IST"), "both", 70, 0.22),
+        (next(x for x in UK_AIRPORTS if x["code"] == "TFS"), "sun", 85, 0.19),
+        (next(x for x in UK_AIRPORTS if x["code"] == "DUB"), "city", 120, 0.13),
+        # North America
+        (next(x for x in UK_AIRPORTS if x["code"] == "JFK"), "city", 220, 0.15),
+        (next(x for x in UK_AIRPORTS if x["code"] == "LAX"), "city", 180, 0.16),
+        (next(x for x in UK_AIRPORTS if x["code"] == "SFO"), "city", 200, 0.14),
+        (next(x for x in UK_AIRPORTS if x["code"] == "ORD"), "city", 150, 0.13),
+        (next(x for x in UK_AIRPORTS if x["code"] == "MIA"), "sun", 170, 0.20),
+        (next(x for x in UK_AIRPORTS if x["code"] == "BOS"), "city", 175, 0.12),
+        (next(x for x in UK_AIRPORTS if x["code"] == "SEA"), "city", 160, 0.13),
+        (next(x for x in UK_AIRPORTS if x["code"] == "LAS"), "city", 110, 0.22),
+        (next(x for x in UK_AIRPORTS if x["code"] == "YYZ"), "city", 145, 0.13),
+        (next(x for x in UK_AIRPORTS if x["code"] == "YVR"), "city", 155, 0.14),
+        (next(x for x in UK_AIRPORTS if x["code"] == "MEX"), "city", 90, 0.18),
+        (next(x for x in UK_AIRPORTS if x["code"] == "CUN"), "sun", 130, 0.22),
+        # South America
+        (next(x for x in UK_AIRPORTS if x["code"] == "GRU"), "city", 95, 0.18),
+        (next(x for x in UK_AIRPORTS if x["code"] == "GIG"), "sun", 110, 0.20),
+        (next(x for x in UK_AIRPORTS if x["code"] == "EZE"), "city", 80, 0.20),
+        (next(x for x in UK_AIRPORTS if x["code"] == "LIM"), "city", 75, 0.16),
+        (next(x for x in UK_AIRPORTS if x["code"] == "BOG"), "city", 70, 0.16),
+        # Middle East
+        (next(x for x in UK_AIRPORTS if x["code"] == "DXB"), "sun", 140, 0.16),
+        (next(x for x in UK_AIRPORTS if x["code"] == "DOH"), "sun", 155, 0.14),
+        (next(x for x in UK_AIRPORTS if x["code"] == "TLV"), "both", 165, 0.18),
+        # Asia
+        (next(x for x in UK_AIRPORTS if x["code"] == "SIN"), "city", 195, 0.13),
+        (next(x for x in UK_AIRPORTS if x["code"] == "BKK"), "both", 90, 0.20),
+        (next(x for x in UK_AIRPORTS if x["code"] == "HKT"), "sun", 110, 0.22),
+        (next(x for x in UK_AIRPORTS if x["code"] == "HND"), "city", 200, 0.14),
+        (next(x for x in UK_AIRPORTS if x["code"] == "ICN"), "city", 150, 0.14),
+        (next(x for x in UK_AIRPORTS if x["code"] == "PEK"), "city", 110, 0.16),
+        (next(x for x in UK_AIRPORTS if x["code"] == "PVG"), "city", 130, 0.16),
+        (next(x for x in UK_AIRPORTS if x["code"] == "HKG"), "city", 175, 0.14),
+        (next(x for x in UK_AIRPORTS if x["code"] == "DEL"), "city", 85, 0.18),
+        (next(x for x in UK_AIRPORTS if x["code"] == "BOM"), "city", 95, 0.18),
+        (next(x for x in UK_AIRPORTS if x["code"] == "DPS"), "sun", 100, 0.24),
+        (next(x for x in UK_AIRPORTS if x["code"] == "KUL"), "city", 95, 0.16),
+        (next(x for x in UK_AIRPORTS if x["code"] == "MNL"), "city", 105, 0.20),
+        # Africa
+        (next(x for x in UK_AIRPORTS if x["code"] == "CAI"), "sun", 90, 0.22),
+        (next(x for x in UK_AIRPORTS if x["code"] == "RAK"), "sun", 95, 0.20),
+        (next(x for x in UK_AIRPORTS if x["code"] == "JNB"), "city", 120, 0.18),
+        (next(x for x in UK_AIRPORTS if x["code"] == "CPT"), "both", 145, 0.18),
+        (next(x for x in UK_AIRPORTS if x["code"] == "NBO"), "city", 135, 0.20),
+        # Oceania
+        (next(x for x in UK_AIRPORTS if x["code"] == "SYD"), "both", 195, 0.16),
+        (next(x for x in UK_AIRPORTS if x["code"] == "MEL"), "city", 175, 0.15),
+        (next(x for x in UK_AIRPORTS if x["code"] == "AKL"), "city", 165, 0.16),
+    ]
 ]
 
 AIRLINES = [
@@ -202,6 +357,37 @@ def _airport(code: str): return next((a for a in UK_AIRPORTS if a["code"] == cod
 def _destination(code: str): return next((d for d in DESTINATIONS if d["code"] == code), None)
 
 
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Great-circle distance between two points in km."""
+    from math import asin, cos, radians, sin, sqrt
+    r = 6371.0
+    p1, p2 = radians(lat1), radians(lat2)
+    dp = radians(lat2 - lat1); dl = radians(lon2 - lon1)
+    a = sin(dp / 2) ** 2 + cos(p1) * cos(p2) * sin(dl / 2) ** 2
+    return 2 * r * asin(sqrt(a))
+
+
+def _route_base_flight(dep: str, dest: str) -> float:
+    """One-way base flight cost (£) derived from great-circle distance.
+
+    Same airport → 0. Domestic short-hop ≥ £30. Long-haul scales sub-linearly.
+    """
+    a = _airport(dep)
+    b = _airport(dest)
+    if not a or not b:
+        return 80.0
+    km = _haversine_km(a["lat"], a["lng"], b["lat"], b["lng"])
+    if km < 50:
+        return 0.0
+    # Sub-linear: short hops feel proportional, long hauls don't blow up.
+    # Calibration: 1000km ≈ £75, 5000km ≈ £230, 9000km ≈ £375, 16000km ≈ £580.
+    base = 28 + (km ** 0.78) * 0.45
+    # Crossing oceans / regions adds a structural surcharge.
+    if a["region"] != b["region"]:
+        base *= 1.18
+    return round(base, 2)
+
+
 def _seasonal_multiplier(day: datetime) -> float:
     month = day.month
     base = 0.85 + 0.25 * abs((month - 1) % 12 - 6) / 6
@@ -217,6 +403,8 @@ def _flight_price(dep, dest, day, base, vol):
 
 
 def _hotel_price(dest, day, base, vol):
+    rng = _rng("htl", dest, day.isoformat())
+    return round(base * _seasonal_multiplier(day) * rng.uniform(1 - vol * 0.6, 1 + vol * 0.6), 2)
     rng = _rng("htl", dest, day.isoformat())
     return round(base * _seasonal_multiplier(day) * rng.uniform(1 - vol * 0.6, 1 + vol * 0.6), 2)
 
@@ -284,12 +472,13 @@ def _evaluate_destination(req: OptimizeRequest, dest: dict):
     start = today + timedelta(days=req.start_window_days)
     flex = max(req.flexibility_days, 3)
     out = []
+    base_flight = _route_base_flight(req.departure, dest["code"])
     for offset in range(-flex, flex + 1):
         ci_d = start + timedelta(days=offset)
         co_d = ci_d + timedelta(days=req.trip_length)
         ci = datetime.combine(ci_d, datetime.min.time())
         co = datetime.combine(co_d, datetime.min.time())
-        flight = _build_flight_option(req.departure, dest["code"], ci, co, dest["base_flight"], dest["volatility"])
+        flight = _build_flight_option(req.departure, dest["code"], ci, co, base_flight, dest["volatility"])
         hotel = _build_hotel_option(dest["code"], ci, req.trip_length, dest["base_hotel"], dest["volatility"], req.hotel_standard)
         total = round(flight.price + hotel.total, 2)
         out.append({"check_in": ci, "check_out": co, "flight": flight, "hotel": hotel, "total": total})
@@ -305,7 +494,9 @@ def _optimise(req: OptimizeRequest) -> OptimizeResponse:
         if not dests:
             raise HTTPException(status_code=400, detail=f"Unknown destination {req.destination}")
     else:
-        dests = list(DESTINATIONS)
+        # "Anywhere" — exclude same airport / same city as the departure.
+        dep_meta_full = _airport(req.departure)
+        dests = [d for d in DESTINATIONS if d["code"] != req.departure and d["city"] != dep_meta_full["city"]]
     if req.weather != "any":
         dests = [d for d in dests if d["weather"] == req.weather or d["weather"] == "both"]
     all_candidates = []
