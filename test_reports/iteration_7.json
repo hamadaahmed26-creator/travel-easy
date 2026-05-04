@@ -1,0 +1,53 @@
+{
+  "summary": "Iteration 7 retest after E1 fixed the 4 iter-6 blockers. FRONTEND is fully green: index.tsx now bundles cleanly (web preview HTTP 200), home screen renders, departure-input opens picker, picker-search auto-focuses, typing 'jed' calls /api/airports/search and renders picker-item-JED, tapping selects Jeddah and closes picker, re-opening shows picker-recent-row with a recent-JED chip that re-selects Jeddah, typing 'xxxyyy' shows picker-no-results with helpful copy, and the full optimise flow (£500 → Anywhere) returns 3 ranked cards (Sarajevo Cheapest / Karlovy Vary Best Value / Bratislava Lowest Risk) with savings chips and verdict banner. BACKEND: the 4 iter-6 features under test are ALL fixed — /api/airports/search?q=saudi returns JED+RUH+multiple Saudi cities, ?q=vietnam returns HAN+SGN, ?q=jed puts JED on top, ?q=lagos returns LOS, /api/airports returns 95 curated popular departures, /api/optimize from JED→Anywhere returns 3 options over ~1177+ destinations. However 3 iter-5 regressions surfaced in test_tripopt_api.py that the iter-6 global-large-airport pool introduced (NOT in the scope E1 flagged but worth reporting): (a) LHR→LHR with explicit destination=LHR is NOT rejected — same-airport guard only exists in the Anywhere branch, (b) SYD→Anywhere(weather=sun) returns WSI which is also 'Sydney, Australia' — same-city guard uses strict equality but SYD is stored as city='Sydney (Mascot)' while WSI is 'Sydney', so the guard fails, (c) weather=city filter allowlist in test vs. reality — SJJ (Sarajevo) now surfaces where the test expected only a fixed curated shortlist (minor test-data drift). Overall: 36/39 backend pass, 100% frontend pass on iter-7-scoped flows.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/optimize (fixed destination = departure)",
+        "issue": "Passing {departure:'LHR', destination:'LHR'} returns 200 with LHR→LHR trips. Same-airport guard only applies in the Anywhere branch (server.py:323). Should either reject with 400 'Destination must differ from departure' or skip and raise 404, symmetrically with the Anywhere branch."
+      },
+      {
+        "endpoint": "POST /api/optimize (Anywhere from SYD)",
+        "issue": "Same-city guard uses strict string equality: `d['city'] != dep_meta_full['city']`. SYD is stored as city='Sydney (Mascot)' and WSI as city='Sydney' (both Australia), so WSI/BWU bypass the guard and the user sees 'Sydney → Sydney' trips. Recommend normalising: split off anything in parens and compare lower-cased base city, OR compare municipality/iata_city fields."
+      },
+      {
+        "endpoint": "POST /api/optimize weather=city",
+        "issue": "SJJ (Sarajevo) now surfaces in weather=city results for some city-weather combinations that the iter-5 test expected to be a small curated set. Test allowlist needs updating OR the dest[weather] classification for SJJ/other new entrants needs review. Harmless to users but test_optimize_weather_city_filters_correctly fails."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      { "component": "multiple", "issue": "`props.pointerEvents is deprecated. Use style.pointerEvents` warning still logs (carryover from iter 3/4/5/6). Non-blocking." }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_airports_search.py",
+    "/app/backend/tests/test_tripopt_api.py",
+    "/app/backend/tests/test_pro_mode.py",
+    "/app/test_reports/pytest/iter7.xml"
+  ],
+  "action_items": [
+    "BACKEND MINOR — server.py _optimise: when req.destination is set and equals req.departure, raise HTTPException 400 (symmetry with the Anywhere same-airport guard).",
+    "BACKEND MINOR — server.py _optimise line 323: normalise city comparison to strip parenthetical suffixes / lowercase before comparing, so SYD (`Sydney (Mascot)`) and WSI/BWU (`Sydney`) both resolve to the same base city and Anywhere searches from SYD exclude all Sydney-area airports.",
+    "TEST DRIFT — test_optimize_weather_city_filters_correctly allowlist needs either (a) expansion to include SJJ + other new iter-6 city-weather destinations, or (b) the weather classification on DESTINATIONS for those codes should be reviewed.",
+    "No retest needed for the iter-7 scope — all 13 features E1 asked to verify are green."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now ~929 lines — splitting into routers (auth, trips, payments, push, watcher, optimize, reference) remains worth doing (carried forward from iter 5/6).",
+    "index.tsx is 820 lines — the AirportPicker modal + Recent-chip helpers are ~240 of those; extracting into /app/frontend/src/components/AirportPicker.tsx would bring the home screen under 600 lines (carried forward from iter 6).",
+    "Airport search endpoint correctly loops over 4441 airports per request; acceptable at current traffic but an inverted index on (code/city/country_name) would be a 10x win if load increases.",
+    "Same-airport / same-city guard in _optimise only runs for Anywhere; consider unifying with a single pre-filter helper so fixed-destination can share the same sanity check."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "92.3% (36/39) — 3 pre-existing regressions unrelated to iter-7 scope; 100% (9/9) of iter-7-scoped tests pass", "frontend": "100% (7/7 scoped flows pass)" },
+  "seed_data_creation": "No new seed. test_pro_mode.py continues to seed+teardown TEST_* users/sessions inline per-class.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iter-7 complete. All 4 E1-flagged bugs from iter-6 are fixed and verified end-to-end (backend country-name search + frontend bundle + useRef import + RECENT_*/loadRecent/pushRecent helpers). Remaining open items are in backend _optimise (3 test failures predating this iteration's scope): same-airport guard asymmetric between Anywhere vs fixed-destination, and city-string equality breaks for SYD's 'Sydney (Mascot)' vs WSI's 'Sydney'. Front-end has a residual `props.pointerEvents` deprecation warning (carried from iter 3). Nothing blocking the feature release.",
+  "rca_of_issue": "Iter-6 bug #1 (tail garbage in index.tsx) — FIXED: file now ends at line 820 cleanly, tsc --noEmit passes, web bundle serves 200. Iter-6 bug #2 (missing useRef/AsyncStorage/RECENT_* helpers) — FIXED: confirmed live via picker re-open showing the RECENT row with the JED chip after selecting JED; tapping the chip re-selects Jeddah. Iter-6 bug #3 (missing RecentRow component + chip styles) — FIXED: 'RECENT' header + JED chip render and are tappable. Iter-6 bug #4 (backend country-name search) — FIXED: curl $BASE/api/airports/search?q=saudi returns 5 Saudi airports (JED,RUH,DMM,MED,TUU) and ?q=vietnam returns HAN+SGN+others. Cache-file regeneration correctly enriched each row with country_name. New issues discovered (minor): same-city guard fails for Sydney because SYD.city='Sydney (Mascot)' ≠ WSI.city='Sydney'; fix by stripping parenthetical suffixes before comparison. Same-airport guard missing in the fixed-destination branch; fix by adding `if req.destination == req.departure: raise HTTPException(400, ...)` at the top of _optimise."
+}

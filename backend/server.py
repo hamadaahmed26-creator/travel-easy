@@ -478,6 +478,7 @@ async def search_airports(q: str = Query("", min_length=0, max_length=50),
         city = a["city"].lower()
         name = a["name"].lower()
         country = (a.get("country") or "").lower()
+        country_name = (a.get("country_name") or "").lower()
         score = 0
         if code == query:
             score = 100
@@ -487,8 +488,14 @@ async def search_airports(q: str = Query("", min_length=0, max_length=50),
             score = 95
         elif city.startswith(query):
             score = 85
+        elif country_name == query:
+            score = 80
+        elif country_name.startswith(query):
+            score = 75
         elif query in city:
             score = 70
+        elif query in country_name:
+            score = 65
         elif country.startswith(query):
             score = 60
         elif query in name:

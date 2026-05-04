@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Slider from "@react-native-community/slider";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -21,6 +22,26 @@ import { api, type Airport, type Destination, type OptimizeRequest } from "../sr
 import { useAuth } from "../src/auth";
 import { persistResults } from "../src/store";
 import { colors, radii, spacing } from "../src/theme";
+
+const RECENT_DEP_KEY = "tripopt:recent_departures";
+const RECENT_DEST_KEY = "tripopt:recent_destinations";
+const MAX_RECENT = 5;
+
+async function pushRecent(key: string, code: string) {
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    const list: string[] = raw ? JSON.parse(raw) : [];
+    const next = [code, ...list.filter((c) => c !== code)].slice(0, MAX_RECENT);
+    await AsyncStorage.setItem(key, JSON.stringify(next));
+  } catch {}
+}
+
+async function loadRecent(key: string): Promise<string[]> {
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
 
 type WeatherPref = "any" | "sun" | "city";
 type HotelPref = "any" | "budget" | "mid";
@@ -74,7 +95,7 @@ export default function SearchScreen() {
     const q = pickerSearch.trim();
     if (!q) {
       // Show curated/popular set when empty
-      setPickerResults(pickerOpen === "departure" ? airports : destinations);
+      setPickerResults((pickerOpen === "departure" ? airports : destinations) as Airport[]);
       setPickerLoading(false);
       return;
     }
@@ -757,18 +778,43 @@ const styles = StyleSheet.create({
     color: colors.brand,
     letterSpacing: 1,
   },
-});
-nItems: "center",
-    paddingVertical: spacing.md,
+  searchHint: {
+    fontSize: 11,
+    color: colors.inkMuted,
+    fontWeight: "700",
+    letterSpacing: 1,
+    marginBottom: spacing.sm,
+  },
+  recentBox: {
+    paddingBottom: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    marginBottom: spacing.sm,
   },
-  pickerCity: { fontSize: 15, fontWeight: "700", color: colors.ink },
-  pickerSub: { fontSize: 12, color: colors.inkMuted, marginTop: 2 },
-  pickerCode: {
-    fontSize: 13,
+  recentTitle: {
+    fontSize: 10,
+    color: colors.inkMuted,
     fontWeight: "800",
-    color: colors.brand,
-    letterSpacing: 1,
+    letterSpacing: 1.6,
+    marginBottom: spacing.sm,
+  },
+  recentChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    maxWidth: 160,
+  },
+  recentChipCode: { fontSize: 11, fontWeight: "900", color: colors.brand, letterSpacing: 1 },
+  recentChipCity: { fontSize: 12, color: colors.ink, flexShrink: 1 },
+  noResults: {
+    fontSize: 13,
+    color: colors.inkSecondary,
+    paddingVertical: spacing.lg,
+    textAlign: "center",
   },
 });

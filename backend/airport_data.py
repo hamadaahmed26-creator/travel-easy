@@ -21,6 +21,49 @@ DATA_DIR = Path(__file__).parent / "data"
 CACHE_FILE = DATA_DIR / "airports_cache.json"
 CACHE_VERSION = 2
 
+# ISO-2 → full English country name. Used so users can type "saudi" or
+# "vietnam" and find airports in those countries (CSV only stores ISO-2).
+ISO2_TO_NAME: dict[str, str] = {
+    "GB": "United Kingdom", "US": "United States", "AE": "United Arab Emirates",
+    "SA": "Saudi Arabia", "KR": "South Korea", "KP": "North Korea",
+    "RU": "Russia", "TR": "Turkey", "VN": "Vietnam", "CZ": "Czechia",
+    "IE": "Ireland", "FR": "France", "DE": "Germany", "NL": "Netherlands",
+    "BE": "Belgium", "LU": "Luxembourg", "CH": "Switzerland", "AT": "Austria",
+    "IT": "Italy", "ES": "Spain", "PT": "Portugal", "MT": "Malta", "CY": "Cyprus",
+    "GR": "Greece", "SE": "Sweden", "NO": "Norway", "DK": "Denmark", "FI": "Finland",
+    "IS": "Iceland", "PL": "Poland", "SK": "Slovakia", "HU": "Hungary",
+    "RO": "Romania", "BG": "Bulgaria", "HR": "Croatia", "RS": "Serbia",
+    "BA": "Bosnia and Herzegovina", "AL": "Albania", "MK": "North Macedonia",
+    "ME": "Montenegro", "SI": "Slovenia", "EE": "Estonia", "LV": "Latvia", "LT": "Lithuania",
+    "UA": "Ukraine", "BY": "Belarus", "GE": "Georgia", "AM": "Armenia", "AZ": "Azerbaijan",
+    "MD": "Moldova", "XK": "Kosovo",
+    "QA": "Qatar", "KW": "Kuwait", "BH": "Bahrain", "OM": "Oman", "JO": "Jordan",
+    "LB": "Lebanon", "IL": "Israel", "PS": "Palestine", "IR": "Iran", "IQ": "Iraq",
+    "SY": "Syria", "YE": "Yemen",
+    "EG": "Egypt", "MA": "Morocco", "TN": "Tunisia", "DZ": "Algeria", "LY": "Libya",
+    "ZA": "South Africa", "KE": "Kenya", "NG": "Nigeria", "ET": "Ethiopia", "GH": "Ghana",
+    "TZ": "Tanzania", "UG": "Uganda", "RW": "Rwanda", "SN": "Senegal", "CI": "Ivory Coast",
+    "CM": "Cameroon", "ZW": "Zimbabwe", "ZM": "Zambia", "BW": "Botswana", "NA": "Namibia",
+    "MU": "Mauritius", "SC": "Seychelles", "MG": "Madagascar", "MZ": "Mozambique",
+    "AO": "Angola", "SD": "Sudan", "DJ": "Djibouti", "ER": "Eritrea",
+    "JP": "Japan", "CN": "China", "HK": "Hong Kong", "TW": "Taiwan", "MO": "Macau",
+    "MN": "Mongolia", "SG": "Singapore", "MY": "Malaysia", "TH": "Thailand",
+    "KH": "Cambodia", "LA": "Laos", "MM": "Myanmar", "ID": "Indonesia",
+    "PH": "Philippines", "BN": "Brunei",
+    "IN": "India", "PK": "Pakistan", "BD": "Bangladesh", "LK": "Sri Lanka",
+    "NP": "Nepal", "MV": "Maldives", "BT": "Bhutan",
+    "KZ": "Kazakhstan", "UZ": "Uzbekistan", "KG": "Kyrgyzstan", "TJ": "Tajikistan",
+    "TM": "Turkmenistan", "AF": "Afghanistan",
+    "AU": "Australia", "NZ": "New Zealand", "FJ": "Fiji", "PF": "French Polynesia",
+    "NC": "New Caledonia", "VU": "Vanuatu", "WS": "Samoa", "TO": "Tonga", "PG": "Papua New Guinea",
+    "CA": "Canada", "MX": "Mexico", "GT": "Guatemala", "BZ": "Belize", "SV": "El Salvador",
+    "HN": "Honduras", "NI": "Nicaragua", "CR": "Costa Rica", "PA": "Panama",
+    "CU": "Cuba", "DO": "Dominican Republic", "JM": "Jamaica", "BS": "Bahamas",
+    "BB": "Barbados", "TT": "Trinidad and Tobago", "PR": "Puerto Rico", "HT": "Haiti",
+    "BR": "Brazil", "AR": "Argentina", "CL": "Chile", "CO": "Colombia", "PE": "Peru",
+    "EC": "Ecuador", "VE": "Venezuela", "BO": "Bolivia", "PY": "Paraguay", "UY": "Uruguay",
+}
+
 # £/night baseline for a 3-star room, by ISO-2 country code.
 HOTEL_RATES: dict[str, int] = {
     "US": 165, "CA": 150, "GB": 145, "IE": 130,
@@ -225,6 +268,9 @@ async def load_airports() -> tuple[dict[str, dict], list[dict]]:
             logger.error("OurAirports fetch failed: %s; using empty list", e)
             raw = []
     enriched = [_enrich(a) for a in raw]
+    # Add full country name for searchability
+    for a in enriched:
+        a["country_name"] = ISO2_TO_NAME.get(a.get("country") or "", a.get("country") or "")
     by_code = {a["code"]: a for a in enriched}
     enriched.sort(key=lambda a: (not a["is_large"], a["city"]))
     return by_code, enriched
