@@ -1,0 +1,57 @@
+{
+  "summary": "Backend fully working: 8/8 pytest tests pass covering airports, destinations, optimize (3 ranked options, fixed-destination, weather filter, 400 on bad departure, 422 on out-of-range budget), and save/list/delete roundtrip with no _id leakage. Frontend home screen renders correctly with all testIDs, and /saved empty state works. However a BLOCKING bug prevents navigation to /loading, /results, /trip/[id] and prevents saving trips: tapping Optimise throws 'AsyncStorage.default.multiSet is not a function' on web.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "SearchScreen / persistResults (src/store.ts)",
+        "issue": "Tapping Optimise triggers runtime error 'AsyncStorage.default.multiSet is not a function' shown above the CTA. Navigation to /loading never happens, so the entire optimise → results → trip-detail → save flow is untestable on web preview.",
+        "testID": "optimise-btn",
+        "priority": "CRITICAL"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Optimise → /loading → /results → /trip/[id] → save",
+        "issue": "Blocked by the AsyncStorage multiSet error; /loading and /results were never reached during testing.",
+        "affected_testIDs": ["optimise-btn", "trip-card", "book-now-badge", "save-trip-btn"]
+      }
+    ],
+    "design_issues": [],
+    "react_native_issues": [
+      {
+        "component": "@react-native-async-storage/async-storage",
+        "issue": "Installed 3.0.2, but Expo warns 'expected version: 2.2.0'. The 3.x build apparently ships a broken web default export — the runtime reaches `AsyncStorage.default` whose `multiSet` is undefined. Affects any web target; Expo Go on mobile may still work but was not tested here."
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_tripopt_api.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Fix AsyncStorage web incompatibility. Recommended: run `npx expo install @react-native-async-storage/async-storage` which pins to the Expo-compatible 2.2.0, OR add a tiny web polyfill (wrap AsyncStorage in src/store.ts so that on web it falls back to localStorage-backed multiSet/multiGet). After the fix, restart expo (`sudo supervisorctl restart expo`) and retest the full Optimise → Results → Trip detail → Save → Saved list → Delete flow.",
+    "Once unblocked, re-run frontend E2E to verify: 3 ranked cards render with correct rank_label badges, recommendation/confidence badge shows on each card, trip detail shows sparkline + sticky book buttons, affiliate URLs open in new tab, saving pushes the trip to /saved and DELETE removes it."
+  ],
+  "critical_code_review_comments": [
+    "src/store.ts uses AsyncStorage.multiSet/multiGet without any web fallback — fragile against async-storage version bumps. Consider a thin wrapper that prefers localStorage on web.",
+    "backend/server.py uses @app.on_event('shutdown') which is deprecated in FastAPI 0.100+. Prefer lifespan context managers. Non-blocking, low priority.",
+    "backend server.py is 527 lines and close to the 700-line split threshold; pricing engine (~200 lines) could be extracted into pricing.py for maintainability."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_tripopt_api.py (new)",
+    "/app/backend/tests/__init__.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (8/8 pytest tests)",
+    "frontend": "~30% (home + saved render; optimise/results/trip/save flow blocked)"
+  },
+  "seed_data_creation": "None. Tests create one saved trip under a unique id and clean it up via DELETE in the same test.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend is solid; reuse /app/backend/tests/test_tripopt_api.py as regression. After main agent fixes the AsyncStorage web issue, focus frontend E2E on: (1) optimise-btn click → URL changes to /loading, rotating stages visible, auto-redirect to /results within ~4s; (2) /results shows exactly 3 trip cards with CHEAPEST / BEST VALUE / LOWEST RISK badges and a book_now/wait confidence badge; (3) tapping a card opens /trip/[id] with breakdown, sparkline, and sticky Book flight / Book hotel; (4) Save trip calls POST /api/trips/save and the trip appears on /saved; (5) DELETE on /saved removes it. Use mobile viewport 390x844. Backend URL: EXPO_PUBLIC_BACKEND_URL from frontend/.env.",
+  "rca_of_issue": "Root cause: package.json pins @react-native-async-storage/async-storage@^3.0.2, but Expo's compatibility matrix expects 2.2.0 (warning visible in /var/log/supervisor/expo.err.log). On the web build, the 3.x package default export resolves to an object whose `multiSet` is undefined — the UI surfaces the raw error string `AsyncStorage.default.multiSet is not a function` when persistResults() runs in app/index.tsx onOptimise. Reproduction: load /, tap 'Optimise my trip' — error text appears above the CTA and navigation never proceeds. Mitigation: (a) `cd /app/frontend && npx expo install @react-native-async-storage/async-storage` to pin 2.2.0, then `sudo supervisorctl restart expo`; OR (b) in src/store.ts, add a web polyfill that uses window.localStorage when Platform.OS === 'web' (most robust)."
+}
