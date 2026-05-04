@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { loadResults } from "../src/store";
 import { colors, radii, spacing } from "../src/theme";
-import type { OptimizeResponse, TripOption } from "../src/api";
+import type { OptimizeRequest, OptimizeResponse, TripOption } from "../src/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const ACTIVE_KEY = "tripopt:active_trip";
@@ -19,15 +19,22 @@ const ACTIVE_KEY = "tripopt:active_trip";
 export default function ResultsScreen() {
   const router = useRouter();
   const [data, setData] = useState<OptimizeResponse | null>(null);
+  const [request, setRequest] = useState<OptimizeRequest | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
-      const { response } = await loadResults();
+      const { response, request: req } = await loadResults();
       setData(response);
+      setRequest(req);
       setLoading(false);
     })();
   }, []);
+
+  const cheapest = useMemo(
+    () => data?.options.find((o) => o.rank_label === "Cheapest") ?? data?.options[0] ?? null,
+    [data]
+  );
 
   const openDetail = async (trip: TripOption) => {
     await AsyncStorage.setItem(ACTIVE_KEY, JSON.stringify(trip));
@@ -74,16 +81,33 @@ export default function ResultsScreen() {
         </View>
       </View>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.summary}>
-          <Text style={styles.summaryLabel}>SEARCH MEDIAN</Text>
-          <Text style={styles.summaryValue}>£{Math.round(data.median_total)}</Text>
-          <Text style={styles.summarySub}>
-            Median total cost across all candidate flight + hotel pairs in your window.
-          </Text>
-        </View>
+        {request && cheapest ? (
+          <View style={styles.verdict} testID="verdict-banner">
+            <Text style={styles.verdictEyebrow}>VERDICT · £{request.budget} BUDGET</Text>
+            <Text style={styles.verdictHeadline}>
+              {cheapest.savings_vs_budget >= 0
+                ? `${cheapest.destination_city} for £${Math.round(cheapest.total_price)}.`
+                : `Best match: ${cheapest.destination_city} at £${Math.round(cheapest.total_price)}.`}
+            </Text>
+            <Text style={styles.verdictSub}>
+              {cheapest.savings_vs_budget >= 0
+                ? `That's £${Math.round(cheapest.savings_vs_budget)} under your budget — keep it for spending money.`
+                : `£${Math.round(-cheapest.savings_vs_budget)} over your budget. Try a higher budget or a different week.`}
+            </Text>
+            <View style={styles.verdictStatsRow}>
+              <Stat label="COMBOS" value={String(data.searched_combinations)} />
+              <Stat label="MEDIAN" value={`£${Math.round(data.median_total)}`} />
+              <Stat
+                label={cheapest.savings_vs_budget >= 0 ? "YOU SAVE" : "OVER BUDGET"}
+                value={`£${Math.round(Math.abs(cheapest.savings_vs_budget))}`}
+                emphasis={cheapest.savings_vs_budget >= 0 ? "good" : "bad"}
+              />
+            </View>
+          </View>
+        ) : null}
 
         {data.options.map((trip) => (
-          <TripCard key={trip.id} trip={trip} onPress={() => openDetail(trip)} />
+          <TripCard key={trip.id} trip={trip} budget={request?.budget ?? 0} onPress={() => openDetail(trip)} />
         ))}
 
         <View style={{ height: spacing.xxl }} />
@@ -92,9 +116,11 @@ export default function ResultsScreen() {
   );
 }
 
-function TripCard({ trip, onPress }: { trip: TripOption; onPress: () => void }) {
+function TripCard({ trip, budget, onPress }: { trip: TripOption; budget: number; onPress: () => void }) {
   const isBuy = trip.recommendation === "book_now";
   const labelColor = colors.ranking[trip.rank_label] ?? colors.ink;
+  const savings = budget > 0 ? budget - trip.total_price : 0;
+  const underBudget = savings >= 0;
   return (
     <TouchableOpacity
       testID={`trip-card-${trip.rank_label.replace(/\s+/g, "-").toLowerCase()}`}
@@ -118,6 +144,27 @@ function TripCard({ trip, onPress }: { trip: TripOption; onPress: () => void }) 
       <Text style={styles.heroSub}>
         Total trip · {trip.nights} nights · {formatRange(trip.check_in, trip.check_out)}
       </Text>
+
+      {budget > 0 && (
+        <View
+          style={[
+            styles.savingsChip,
+            { backgroundColor: underBudget ? colors.buyBg : colors.waitBg },
+          ]}
+          testID={`savings-chip-${trip.rank_label.replace(/\s+/g, "-").toLowerCase()}`}
+        >
+          <Ionicons
+            name={underBudget ? "arrow-down" : "arrow-up"}
+            size={12}
+            color={underBudget ? colors.buy : colors.wait}
+          />
+          <Text style={[styles.savingsText, { color: underBudget ? colors.buy : colors.wait }]}>
+            {underBudget
+              ? `£${Math.round(savings)} UNDER YOUR £${budget} BUDGET`
+              : `£${Math.round(-savings)} OVER YOUR £${budget} BUDGET`}
+          </Text>
+        </View>
+      )}
 
       <View style={styles.divider} />
 
@@ -152,6 +199,17 @@ function TripCard({ trip, onPress }: { trip: TripOption; onPress: () => void }) 
         </Text>
       </View>
     </TouchableOpacity>
+  );
+}
+
+function Stat({ label, value, emphasis }: { label: string; value: string; emphasis?: "good" | "bad" }) {
+  const valueColor =
+    emphasis === "good" ? colors.buy : emphasis === "bad" ? colors.wait : "#FFFFFF";
+  return (
+    <View style={styles.stat}>
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={[styles.statValue, { color: valueColor }]}>{value}</Text>
+    </View>
   );
 }
 
@@ -216,6 +274,68 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 22, color: colors.ink, fontWeight: "800", letterSpacing: -0.5 },
   scroll: { padding: spacing.lg, gap: spacing.lg },
+  verdict: {
+    backgroundColor: colors.brand,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+  },
+  verdictEyebrow: {
+    fontSize: 11,
+    color: "#94A3B8",
+    fontWeight: "800",
+    letterSpacing: 1.6,
+  },
+  verdictHeadline: {
+    fontSize: 26,
+    color: "#FFFFFF",
+    fontWeight: "900",
+    letterSpacing: -0.8,
+    lineHeight: 30,
+    marginTop: 6,
+  },
+  verdictSub: {
+    fontSize: 13,
+    color: "#94A3B8",
+    marginTop: spacing.sm,
+    lineHeight: 18,
+  },
+  verdictStatsRow: {
+    flexDirection: "row",
+    gap: spacing.md,
+    marginTop: spacing.lg,
+  },
+  stat: {
+    flex: 1,
+    backgroundColor: "#0B1424",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: "#1E293B",
+  },
+  statLabel: {
+    fontSize: 9,
+    color: "#64748B",
+    fontWeight: "800",
+    letterSpacing: 1.2,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: "900",
+    letterSpacing: -0.5,
+    marginTop: 4,
+  },
+  savingsChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radii.pill,
+    marginTop: spacing.sm,
+  },
+  savingsText: { fontSize: 10, fontWeight: "900", letterSpacing: 1 },
   summary: {
     backgroundColor: colors.bg,
     borderRadius: radii.lg,

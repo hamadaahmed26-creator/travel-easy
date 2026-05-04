@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -61,6 +62,16 @@ export default function TripDetail() {
     }
   };
 
+  const onShare = async () => {
+    if (!trip) return;
+    const message = `${trip.headline} ${trip.nights} nights · ${fmtRange(trip.check_in, trip.check_out)} · ${trip.flight.airline} + ${trip.hotel.name}. Found with TripOpt.`;
+    try {
+      await Share.share({ message, title: "My TripOpt deal" });
+    } catch (_) {
+      // user cancelled
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
       <View style={styles.header}>
@@ -77,6 +88,13 @@ export default function TripDetail() {
             {trip.departure_city} → {trip.destination_city}
           </Text>
         </View>
+        <TouchableOpacity
+          testID="share-trip-btn"
+          onPress={onShare}
+          style={styles.iconBtn}
+        >
+          <Ionicons name="share-outline" size={20} color={colors.ink} />
+        </TouchableOpacity>
         <TouchableOpacity
           testID="save-trip-btn"
           onPress={onSave}
@@ -117,6 +135,7 @@ export default function TripDetail() {
               {isBuy ? "BOOK NOW" : "WAIT"} · {trip.confidence}% CONFIDENCE
             </Text>
           </View>
+          <Text style={styles.headline} testID="trip-headline">{trip.headline}</Text>
           <Text style={styles.rationale}>{trip.rationale}</Text>
         </View>
 
@@ -338,8 +357,16 @@ const styles = StyleSheet.create({
   rationale: {
     fontSize: 13,
     color: colors.inkSecondary,
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
     lineHeight: 18,
+  },
+  headline: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: colors.ink,
+    marginTop: spacing.md,
+    letterSpacing: -0.3,
+    lineHeight: 22,
   },
   sectionTitle: {
     fontSize: 11,

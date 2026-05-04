@@ -123,6 +123,63 @@ class TestOptimize:
         r = api.post(f"{BASE_URL}/api/optimize", json=payload, timeout=30)
         assert r.status_code == 422
 
+    # --- Iteration 3: headline + savings_vs_budget fields ------------------
+    def test_optimize_headline_and_savings_anywhere_budget_500(self, api):
+        payload = {
+            "departure": "BRS",
+            "destination": None,
+            "budget": 500,
+            "trip_length": 4,
+            "flexibility_days": 3,
+            "weather": "any",
+            "hotel_standard": "any",
+            "start_window_days": 30,
+        }
+        r = api.post(f"{BASE_URL}/api/optimize", json=payload, timeout=45)
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert len(body["options"]) == 3
+        for o in body["options"]:
+            assert "headline" in o, f"missing headline: {o.keys()}"
+            assert "savings_vs_budget" in o, f"missing savings_vs_budget: {o.keys()}"
+            assert isinstance(o["headline"], str) and len(o["headline"]) > 10
+            assert isinstance(o["savings_vs_budget"], (int, float))
+            # savings = budget - total_price
+            expected = round(500 - o["total_price"], 2)
+            assert abs(o["savings_vs_budget"] - expected) < 0.01, (
+                o["savings_vs_budget"], expected
+            )
+            # headline content check
+            if o["savings_vs_budget"] >= 0:
+                assert "£500 budget" in o["headline"]
+                assert "save" in o["headline"].lower()
+                assert o["destination_city"] in o["headline"]
+            else:
+                assert "over" in o["headline"].lower()
+                assert "£500" in o["headline"]
+
+    def test_optimize_savings_negative_when_over_budget(self, api):
+        payload = {
+            "departure": "BRS",
+            "destination": None,
+            "budget": 200,
+            "trip_length": 4,
+            "flexibility_days": 3,
+            "weather": "any",
+            "hotel_standard": "any",
+            "start_window_days": 30,
+        }
+        r = api.post(f"{BASE_URL}/api/optimize", json=payload, timeout=45)
+        assert r.status_code == 200, r.text
+        body = r.json()
+        # With £200 budget most/all options should be over-budget
+        over_budget = [o for o in body["options"] if o["savings_vs_budget"] < 0]
+        assert len(over_budget) >= 1, "Expected at least one over-budget option at £200"
+        for o in over_budget:
+            assert "over your £200 budget" in o["headline"].lower(), o["headline"]
+            # negative savings means total > budget
+            assert o["total_price"] > 200
+
 
 # --- saved trips (persistence) ----------------------------------------------
 class TestSavedTrips:

@@ -169,13 +169,17 @@ export default function SearchScreen() {
           <FieldLabel>TO</FieldLabel>
           <TouchableOpacity
             testID="destination-input"
-            style={styles.fieldRow}
+            style={[styles.fieldRow, !destination && styles.fieldRowAnywhere]}
             onPress={() => {
               setPickerSearch("");
               setPickerOpen("destination");
             }}
           >
-            <Ionicons name="location-outline" size={20} color={colors.ink} />
+            <Ionicons
+              name={destination ? "location-outline" : "globe-outline"}
+              size={20}
+              color={destination ? colors.ink : colors.riskLow}
+            />
             <View style={{ flex: 1 }}>
               <Text style={styles.fieldValue} numberOfLines={1}>
                 {destination
@@ -183,7 +187,7 @@ export default function SearchScreen() {
                   : "Anywhere"}
               </Text>
               <Text style={styles.fieldHint}>
-                {destination ? destinationMeta?.country : "Let the optimiser pick the best deal"}
+                {destination ? destinationMeta?.country : "Let the optimiser hunt the best deal globally"}
               </Text>
             </View>
             {destination && (
@@ -207,9 +211,26 @@ export default function SearchScreen() {
           <FieldLabel>BUDGET (TOTAL TRIP)</FieldLabel>
           <View style={styles.fieldBox}>
             <Text style={styles.budgetValue} testID="budget-value">£{budget}</Text>
+            <View style={styles.budgetPresets}>
+              {[300, 500, 750, 1000, 1500].map((preset) => {
+                const active = budget === preset;
+                return (
+                  <TouchableOpacity
+                    key={preset}
+                    testID={`budget-preset-${preset}`}
+                    style={[styles.budgetChip, active && styles.budgetChipActive]}
+                    onPress={() => setBudget(preset)}
+                  >
+                    <Text style={[styles.budgetChipText, active && styles.budgetChipTextActive]}>
+                      £{preset}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
             <Slider
               testID="budget-slider"
-              style={{ marginTop: spacing.sm }}
+              style={{ marginTop: spacing.md }}
               minimumValue={150}
               maximumValue={2000}
               step={25}
@@ -472,6 +493,10 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.bg,
   },
+  fieldRowAnywhere: {
+    borderColor: colors.riskLow,
+    backgroundColor: colors.riskLowBg,
+  },
   fieldBox: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
@@ -488,6 +513,27 @@ const styles = StyleSheet.create({
     color: colors.ink,
     letterSpacing: -1.2,
   },
+  budgetPresets: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  budgetChip: {
+    paddingHorizontal: spacing.md,
+    height: 36,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  budgetChipActive: {
+    backgroundColor: colors.ink,
+    borderColor: colors.ink,
+  },
+  budgetChipText: { fontSize: 13, fontWeight: "800", color: colors.ink },
+  budgetChipTextActive: { color: "#fff" },
   rangeRow: { flexDirection: "row", justifyContent: "space-between" },
   chipRow: { gap: spacing.sm, paddingVertical: 2 },
   chip: {

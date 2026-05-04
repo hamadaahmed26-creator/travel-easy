@@ -151,6 +151,8 @@ class TripOption(BaseModel):
     recommendation: Literal["book_now", "wait"]
     confidence: int  # 0-100
     rationale: str
+    headline: str  # short, share-ready one-liner
+    savings_vs_budget: float  # positive = under budget, negative = over budget
     affiliate_flight_url: str
     affiliate_hotel_url: str
     price_history: List[float]  # last 30 days simulated
@@ -417,6 +419,12 @@ def _optimise(req: OptimizeRequest) -> OptimizeResponse:
             confidence = 65
             rationale = "Prices are stable. " + ("Solid value vs the search median." if recommendation == "book_now" else "Slightly above search median; you may find better.")
 
+        savings = round(req.budget - c["total"], 2)
+        if savings >= 0:
+            headline = f"£{req.budget} budget → {c['dest']['city']} for £{int(round(c['total']))}. You save £{int(round(savings))}."
+        else:
+            headline = f"£{int(round(c['total']))} to {c['dest']['city']} · £{int(round(-savings))} over your £{req.budget} budget."
+
         opt = TripOption(
             id=str(uuid.uuid4()),
             rank_label=label,
@@ -437,6 +445,8 @@ def _optimise(req: OptimizeRequest) -> OptimizeResponse:
             recommendation=recommendation,
             confidence=confidence,
             rationale=rationale,
+            headline=headline,
+            savings_vs_budget=savings,
             affiliate_flight_url=_affiliate_flight(req.departure, c["dest"]["code"], c["check_in"], c["check_out"]),
             affiliate_hotel_url=_affiliate_hotel(c["dest"]["city"], c["check_in"], c["check_out"]),
             price_history=history,

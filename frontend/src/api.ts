@@ -55,6 +55,8 @@ export type TripOption = {
   recommendation: "book_now" | "wait";
   confidence: number;
   rationale: string;
+  headline: string;
+  savings_vs_budget: number;
   affiliate_flight_url: string;
   affiliate_hotel_url: string;
   price_history: number[];

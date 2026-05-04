@@ -79,7 +79,7 @@ export default function LoadingScreen() {
             {String(stage + 1).padStart(2, "0")}
             <Text style={styles.bigNumberMuted}>/{String(STAGES.length).padStart(2, "0")}</Text>
           </Text>
-          <Animated.View style={[styles.shimmer, shimmerStyle]} pointerEvents="none" />
+          <Animated.View style={[styles.shimmer, shimmerStyle, { pointerEvents: "none" }]} />
         </View>
 
         <View style={styles.stagesBox}>
