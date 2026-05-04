@@ -180,7 +180,7 @@ export default function SearchScreen() {
                 {departureMeta ? `${departureMeta.city} (${departureMeta.code})` : "Pick airport"}
               </Text>
               <Text style={styles.fieldHint}>
-                {departureMeta ? departureMeta.name : "UK departure"}
+                {departureMeta ? `${departureMeta.name}${departureMeta.country ? ` · ${departureMeta.country}` : ""}` : "Any departure airport"}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.inkMuted} />

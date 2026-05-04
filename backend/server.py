@@ -405,8 +405,6 @@ def _flight_price(dep, dest, day, base, vol):
 def _hotel_price(dest, day, base, vol):
     rng = _rng("htl", dest, day.isoformat())
     return round(base * _seasonal_multiplier(day) * rng.uniform(1 - vol * 0.6, 1 + vol * 0.6), 2)
-    rng = _rng("htl", dest, day.isoformat())
-    return round(base * _seasonal_multiplier(day) * rng.uniform(1 - vol * 0.6, 1 + vol * 0.6), 2)
 
 
 def _build_flight_option(dep, dest, check_in, check_out, base, vol):
