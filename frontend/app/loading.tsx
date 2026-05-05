@@ -1,4 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Animated, {
@@ -71,98 +72,88 @@ export default function LoadingScreen() {
   }, [req, router]);
 
   return (
-    <SafeAreaView style={styles.safe} testID="loading-screen">
-      <View style={styles.center}>
-        <Text style={styles.eyebrow}>OPTIMISING TRIP PORTFOLIO</Text>
-        <View style={styles.numberWrap}>
-          <Text style={styles.bigNumber} testID="loading-counter">
-            {String(stage + 1).padStart(2, "0")}
-            <Text style={styles.bigNumberMuted}>/{String(STAGES.length).padStart(2, "0")}</Text>
-          </Text>
-          <Animated.View style={[styles.shimmer, shimmerStyle, { pointerEvents: "none" }]} />
-        </View>
-
-        <View style={styles.stagesBox}>
-          {STAGES.map((s, i) => {
-            const active = i === stage;
-            const done = i < stage;
-            return (
-              <View key={s} style={styles.stageRow}>
-                <View
-                  style={[
-                    styles.dot,
-                    done && styles.dotDone,
-                    active && styles.dotActive,
-                  ]}
-                />
-                <Text
-                  style={[
-                    styles.stageText,
-                    active && styles.stageTextActive,
-                    done && styles.stageTextDone,
-                  ]}
-                  testID={active ? "active-stage" : undefined}
-                >
-                  {s}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
-
-        {error ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText} testID="loading-error">{error}</Text>
-            <TouchableOpacity
-              testID="back-to-search-btn"
-              onPress={() => router.replace("/")}
-              style={styles.errorBtn}
-            >
-              <Text style={styles.errorBtnText}>Back to search</Text>
-            </TouchableOpacity>
+    <View style={styles.root} testID="loading-screen">
+      <LinearGradient colors={[...colors.gradHero] as any} locations={[0, 0.55, 1]} style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={{ flex: 1 }}>
+        <View style={styles.center}>
+          <View style={styles.eyebrowRow}>
+            <View style={styles.brandDot} />
+            <Text style={styles.eyebrow}>OPTIMISING TRIP PORTFOLIO</Text>
           </View>
-        ) : (
-          <ActivityIndicator color={colors.ink} style={{ marginTop: spacing.xl }} />
-        )}
-      </View>
-    </SafeAreaView>
+          <View style={styles.numberWrap}>
+            <Text style={styles.bigNumber} testID="loading-counter">
+              {String(stage + 1).padStart(2, "0")}
+              <Text style={styles.bigNumberMuted}>/{String(STAGES.length).padStart(2, "0")}</Text>
+            </Text>
+            <Animated.View style={[styles.shimmer, shimmerStyle, { pointerEvents: "none" }]} />
+          </View>
+
+          <View style={styles.stagesBox}>
+            {STAGES.map((s, i) => {
+              const active = i === stage;
+              const done = i < stage;
+              return (
+                <View key={s} style={styles.stageRow}>
+                  <View style={[styles.dot, done && styles.dotDone, active && styles.dotActive]} />
+                  <Text
+                    style={[styles.stageText, active && styles.stageTextActive, done && styles.stageTextDone]}
+                    testID={active ? "active-stage" : undefined}
+                  >
+                    {s}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+
+          {error ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText} testID="loading-error">{error}</Text>
+              <TouchableOpacity testID="back-to-search-btn" onPress={() => router.replace("/")} style={styles.errorBtn}>
+                <Text style={styles.errorBtnText}>Back to search</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <ActivityIndicator color={colors.brand} style={{ marginTop: spacing.xl }} />
+          )}
+        </View>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
   safe: { flex: 1, backgroundColor: colors.bg },
   center: {
     flex: 1,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.xxxl,
     paddingBottom: spacing.xl,
+    maxWidth: 720,
+    width: "100%",
+    alignSelf: "center",
   },
+  eyebrowRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: spacing.lg },
+  brandDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.brand },
   eyebrow: {
-    color: "#94A3B8",
+    color: colors.brandStrong,
     fontSize: 11,
     letterSpacing: 2,
-    fontWeight: "700",
-    marginBottom: spacing.lg,
+    fontWeight: "800",
   },
-  numberWrap: {
-    overflow: "hidden",
-    paddingVertical: spacing.sm,
-  },
+  numberWrap: { overflow: "hidden", paddingVertical: spacing.sm },
   bigNumber: {
-    color: "#FFFFFF",
-    fontSize: 96,
+    color: colors.ink,
+    fontSize: 120,
     fontWeight: "900",
-    letterSpacing: -4,
-    lineHeight: 100,
+    letterSpacing: -5,
+    lineHeight: 124,
   },
-  bigNumberMuted: { color: "#475569", fontSize: 56 },
+  bigNumberMuted: { color: colors.inkDim, fontSize: 64 },
   shimmer: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    left: 0,
-    width: 220,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    position: "absolute", top: 0, bottom: 0, left: 0, width: 220,
+    backgroundColor: "rgba(91,143,255,0.12)",
   },
   stagesBox: {
     marginTop: spacing.xl,
@@ -174,24 +165,19 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   stageRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#334155",
-  },
-  dotActive: { backgroundColor: "#FFFFFF" },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.borderStrong },
+  dotActive: { backgroundColor: colors.brand },
   dotDone: { backgroundColor: colors.buy },
-  stageText: { color: "#64748B", fontSize: 14 },
-  stageTextActive: { color: "#FFFFFF", fontWeight: "700" },
-  stageTextDone: { color: "#94A3B8" },
+  stageText: { color: colors.inkMuted, fontSize: 14 },
+  stageTextActive: { color: colors.ink, fontWeight: "700" },
+  stageTextDone: { color: colors.inkSecondary },
   errorBox: { marginTop: spacing.xl, alignItems: "center", gap: spacing.md },
-  errorText: { color: "#FCA5A5", textAlign: "center" },
+  errorText: { color: colors.danger, textAlign: "center" },
   errorBtn: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderRadius: radii.md,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.brand,
   },
-  errorBtnText: { color: colors.brand, fontWeight: "800" },
+  errorBtnText: { color: "#fff", fontWeight: "800" },
 });

@@ -178,10 +178,22 @@ test_plan:
   test_all: false
   test_priority: "high_first"
 
+  - task: "Polish remaining screens (login, upgrade, saved, alerts, loading) to match cinematic dark navy"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/login.tsx, /app/frontend/app/upgrade.tsx, /app/frontend/app/saved.tsx, /app/frontend/app/alerts.tsx, /app/frontend/app/loading.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "All secondary screens now use LinearGradient backdrop, gradient CTAs, glass cards, glowing empty-state icons. Saved + Alerts use HoverCard with lift on hover and pull-to-refresh. Login has the globe decoration on wide screens. Loading has cinematic backdrop, brand-coloured stage tracker, and shimmer animation."
+
 agent_communication:
   - agent: "main"
     message: |
-      Major visual overhaul shipped. All three primary screens (Home, Results, Trip Detail)
-      converted to cinematic dark navy with Linear/Stripe vibes. Backend untouched. Login,
-      upgrade, loading screens get the new accent automatically via theme tokens.
-      Pending user choice: deploy now or test more pages first.
+      Phase 2 polish shipped - all 8 screens now share the cinematic dark navy aesthetic with
+      consistent gradient CTAs, glass cards, and brand-coloured accents. Ready for user to deploy
+      via the Deploy button. Backend untouched. After deploy, user will share custom domain and
+      we'll wire up Amadeus for real flight prices (replacing mocked haversine engine in server.py).
