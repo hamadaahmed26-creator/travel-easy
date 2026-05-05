@@ -7,7 +7,8 @@
     "dev": "vite --host 0.0.0.0 --port 3000",
     "build": "tsc -b --noCheck && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 3000",
-    "start": "vite --host 0.0.0.0 --port 3000"
+    "start": "vite --host 0.0.0.0 --port 3000",
+    "expo": "node scripts/start-vite.cjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",

@@ -858,7 +858,8 @@ async def _record_alert(user_id: str, title: str, body: str, saved_trip_id: str,
 
 async def check_watched_trips():
     """Re-runs optimise on every watched trip and emits alerts on material changes."""
-    cursor = db.saved_trips.find({"is_watching": True}, {"_id": 0})
+    # Cap per-run to keep memory + scheduler tick bounded; pagination can be added later if needed.
+    cursor = db.saved_trips.find({"is_watching": True}, {"_id": 0}).limit(200)
     async for st in cursor:
         try:
             t = st["trip"]
