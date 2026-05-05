@@ -246,7 +246,12 @@ POPULAR_DEPARTURES: list[str] = [
 
 
 async def load_airports() -> tuple[dict[str, dict], list[dict]]:
-    """Returns (by_code, list_sorted). Caches to disk on first run."""
+    """Returns (by_code, list_sorted). Caches to disk on first run.
+
+    The returned list also contains synthetic 'city group' entries for any
+    metropolitan area with 2+ large airports (London, NYC, Tokyo, etc.).
+    Their codes are prefixed with 'CITY:' so the optimiser can expand them.
+    """
     DATA_DIR.mkdir(exist_ok=True)
     raw: list[dict] = []
     if CACHE_FILE.exists():
@@ -268,12 +273,49 @@ async def load_airports() -> tuple[dict[str, dict], list[dict]]:
             logger.error("OurAirports fetch failed: %s; using empty list", e)
             raw = []
     enriched = [_enrich(a) for a in raw]
-    # Add full country name for searchability
     for a in enriched:
         a["country_name"] = ISO2_TO_NAME.get(a.get("country") or "", a.get("country") or "")
+
+    # Build "All [City]" group entries for cities with 2+ large airports.
+    groups: dict[tuple[str, str], list[dict]] = {}
+    for a in enriched:
+        if not a.get("is_large"):
+            continue
+        key = (a["city"].lower().split("(")[0].strip(), a.get("country") or "")
+        groups.setdefault(key, []).append(a)
+    city_groups: list[dict] = []
+    for (city_norm, country), members in groups.items():
+        if len(members) < 2:
+            continue
+        display_city = members[0]["city"].split("(")[0].strip()
+        avg_lat = sum(m["lat"] for m in members) / len(members)
+        avg_lng = sum(m["lng"] for m in members) / len(members)
+        member_codes = [m["code"] for m in members]
+        slug = "".join(ch for ch in city_norm if ch.isalnum())
+        country_name = ISO2_TO_NAME.get(country, country)
+        city_groups.append({
+            "code": f"CITY:{slug}-{country}",
+            "name": f"All {display_city} airports",
+            "city": display_city,
+            "country": country,
+            "country_name": country_name,
+            "lat": round(avg_lat, 4),
+            "lng": round(avg_lng, 4),
+            "is_large": True,
+            "is_city_group": True,
+            "member_codes": member_codes,
+            "weather": members[0].get("weather", "city"),
+            "base_hotel": members[0].get("base_hotel", 110),
+            "volatility": members[0].get("volatility", 0.15),
+            "region": members[0].get("region", "OT"),
+        })
+
     by_code = {a["code"]: a for a in enriched}
+    for g in city_groups:
+        by_code[g["code"]] = g
     enriched.sort(key=lambda a: (not a["is_large"], a["city"]))
-    return by_code, enriched
+    # Combined list: city-groups surface first when relevant, then airports
+    return by_code, enriched + city_groups
 
 
 if __name__ == "__main__":

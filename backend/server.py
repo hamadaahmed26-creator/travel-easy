@@ -183,6 +183,16 @@ def _airport(code: str): return _AIRPORTS_BY_CODE.get(code)
 def _destination(code: str): return next((d for d in DESTINATIONS if d["code"] == code), None)
 
 
+def _expand_codes(code: str) -> list[str]:
+    """Resolve a code (regular IATA or CITY:slug-CC city group) to member airports."""
+    a = _AIRPORTS_BY_CODE.get(code)
+    if not a:
+        return []
+    if a.get("is_city_group"):
+        return [c for c in a.get("member_codes", []) if c in _AIRPORTS_BY_CODE]
+    return [code]
+
+
 def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Great-circle distance between two points in km."""
     from math import asin, cos, radians, sin, sqrt
@@ -310,24 +320,31 @@ def _evaluate_destination(req: OptimizeRequest, dest: dict):
 
 
 def _optimise(req: OptimizeRequest) -> OptimizeResponse:
-    dep_meta = _airport(req.departure)
-    if not dep_meta:
+    # Expand city groups (CITY:*) into member airports.
+    dep_codes = _expand_codes(req.departure)
+    if not dep_codes:
         raise HTTPException(status_code=400, detail=f"Unknown departure airport {req.departure}")
+    # For dep cities, we still need a single representative for downstream
+    # (city/region naming). Use the cheapest-distance member at runtime.
+    primary_dep = dep_codes[0]
+    dep_meta = _airport(primary_dep)
     if req.destination:
         if req.destination == req.departure:
             raise HTTPException(status_code=400, detail="Destination must differ from departure")
-        dests = [d for d in DESTINATIONS if d["code"] == req.destination]
-        if not dests:
+        dest_codes = _expand_codes(req.destination)
+        if not dest_codes:
             raise HTTPException(status_code=400, detail=f"Unknown destination {req.destination}")
+        dests = [_AIRPORTS_BY_CODE[c] for c in dest_codes if c in _AIRPORTS_BY_CODE]
     else:
-        # "Anywhere" — exclude same airport / same city as the departure.
-        dep_meta_full = _airport(req.departure)
+        # "Anywhere" — exclude the departure airport(s) and any other airports
+        # in the same city.
         def _norm_city(s: str) -> str:
             return (s or "").split("(")[0].strip().lower()
-        dep_city_norm = _norm_city(dep_meta_full.get("city", "")) if dep_meta_full else ""
+        dep_city_norm = _norm_city(dep_meta.get("city", ""))
+        dep_set = set(dep_codes)
         dests = [
             d for d in DESTINATIONS
-            if d["code"] != req.departure and _norm_city(d["city"]) != dep_city_norm
+            if d["code"] not in dep_set and _norm_city(d["city"]) != dep_city_norm
         ]
     if req.weather != "any":
         dests = [d for d in dests if d["weather"] == req.weather or d["weather"] == "both"]
