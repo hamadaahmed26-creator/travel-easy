@@ -132,10 +132,10 @@ export default function UpgradeScreen() {
           disabled={creating || polling}
         >
           {creating ? (
-            <ActivityIndicator color={colors.ink} />
+            <ActivityIndicator color="#fff" />
           ) : (
             <>
-              <Ionicons name="card" size={18} color={colors.ink} />
+              <Ionicons name="card" size={18} color="#fff" />
               <Text style={styles.ctaText}>{user?.is_pro ? "Extend Pro · £2.99" : "Upgrade to Pro · £2.99"}</Text>
             </>
           )}
@@ -162,7 +162,7 @@ function Benefit({ icon, title, sub }: { icon: any; title: string; sub: string }
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.brand },
+  safe: { flex: 1, backgroundColor: colors.bg },
   header: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md,
@@ -180,8 +180,8 @@ const styles = StyleSheet.create({
   },
   bigSub: { color: "#94A3B8", fontSize: 14 },
   benefitsCard: {
-    backgroundColor: "#0B1424", borderRadius: radii.lg, padding: spacing.lg,
-    borderWidth: 1, borderColor: "#1E293B", gap: spacing.md, marginTop: spacing.md,
+    backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.lg,
+    borderWidth: 1, borderColor: colors.border, gap: spacing.md, marginTop: spacing.md,
   },
   benefit: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
   benefitTitle: { color: "#FFF", fontWeight: "800", fontSize: 14 },
@@ -199,10 +199,10 @@ const styles = StyleSheet.create({
   statusText: { color: "#FFF" },
   error: { color: "#FCA5A5", marginTop: spacing.sm },
   cta: {
-    height: 56, backgroundColor: "#FFFFFF", borderRadius: radii.lg,
+    height: 56, backgroundColor: colors.brand, borderRadius: radii.lg,
     alignItems: "center", justifyContent: "center",
     flexDirection: "row", gap: spacing.sm, marginTop: spacing.md,
   },
-  ctaText: { color: colors.ink, fontWeight: "900", fontSize: 16 },
+  ctaText: { color: "#fff", fontWeight: "900", fontSize: 16 },
   disclaimer: { color: "#64748B", fontSize: 11, textAlign: "center", marginTop: spacing.md },
 });

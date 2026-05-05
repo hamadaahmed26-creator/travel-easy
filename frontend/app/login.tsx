@@ -98,7 +98,7 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.brand },
+  safe: { flex: 1, backgroundColor: colors.bg },
   body: {
     flex: 1, padding: spacing.xl, justifyContent: "center", gap: spacing.lg,
   },
@@ -110,9 +110,9 @@ const styles = StyleSheet.create({
   },
   sub: { color: "#94A3B8", fontSize: 14, lineHeight: 20 },
   googleBtn: {
-    height: 56, backgroundColor: "#0B1424", borderRadius: radii.lg,
+    height: 56, backgroundColor: colors.brand, borderRadius: radii.lg,
     flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: spacing.sm, borderWidth: 1, borderColor: "#1E293B", marginTop: spacing.md,
+    gap: spacing.sm, borderWidth: 1, borderColor: colors.brand, marginTop: spacing.md,
   },
   googleText: { color: "#FFFFFF", fontWeight: "800", fontSize: 16 },
   loadingBox: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginTop: spacing.md },

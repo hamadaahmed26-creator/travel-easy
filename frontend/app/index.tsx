@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Slider from "@react-native-community/slider";
+import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -15,17 +16,21 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
+import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { api, type Airport, type Destination, type OptimizeRequest } from "../src/api";
 import { useAuth } from "../src/auth";
+import Globe from "../src/components/Globe";
 import { persistResults } from "../src/store";
 import { colors, radii, spacing } from "../src/theme";
 
 const RECENT_DEP_KEY = "tripopt:recent_departures";
 const RECENT_DEST_KEY = "tripopt:recent_destinations";
 const MAX_RECENT = 5;
+const WIDE_BREAKPOINT = 960;
 
 async function pushRecent(key: string, code: string) {
   try {
@@ -49,10 +54,13 @@ type HotelPref = "any" | "budget" | "mid";
 export default function SearchScreen() {
   const router = useRouter();
   const { user, refresh } = useAuth();
+  const { width } = useWindowDimensions();
+  const isWide = width >= WIDE_BREAKPOINT;
+
   const [airports, setAirports] = useState<Airport[]>([]);
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [departure, setDeparture] = useState<string>("BRS");
-  const [destination, setDestination] = useState<string | null>(null); // null = Anywhere
+  const [destination, setDestination] = useState<string | null>(null);
   const [budget, setBudget] = useState<number>(500);
   const [tripLength, setTripLength] = useState<number>(4);
   const [flexibility, setFlexibility] = useState<number>(3);
@@ -88,13 +96,11 @@ export default function SearchScreen() {
     })();
   }, []);
 
-  // Live debounced search whenever the picker query changes.
   useEffect(() => {
     if (pickerOpen === null) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     const q = pickerSearch.trim();
     if (!q) {
-      // Show curated/popular set when empty
       setPickerResults((pickerOpen === "departure" ? airports : destinations) as Airport[]);
       setPickerLoading(false);
       return;
@@ -104,9 +110,7 @@ export default function SearchScreen() {
       try {
         const res = await api.searchAirports(q, 50);
         setPickerResults(res.results);
-      } catch {
-        // ignore — keep last results
-      } finally {
+      } catch {} finally {
         setPickerLoading(false);
       }
     }, 200);
@@ -115,7 +119,6 @@ export default function SearchScreen() {
     };
   }, [pickerSearch, pickerOpen, airports, destinations]);
 
-  // Autofocus the search input the moment the picker opens.
   useEffect(() => {
     if (pickerOpen === null) return;
     const t = setTimeout(() => searchInputRef.current?.focus(), 150);
@@ -147,8 +150,6 @@ export default function SearchScreen() {
       start_window_days: 30,
     };
     try {
-      // Navigate to loading screen first; perform request there so the
-      // animation has time to play. We pass the request via storage.
       await persistResults(req, {
         request_id: "",
         generated_at: "",
@@ -164,340 +165,358 @@ export default function SearchScreen() {
     }
   };
 
-  const filteredPickerData = pickerResults;
-
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+    <View style={styles.root}>
+      {/* Cinematic gradient backdrop */}
+      <LinearGradient
+        colors={[...colors.gradHero] as any}
+        locations={[0, 0.55, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+
+      <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          <View style={styles.header}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.eyebrow} testID="brand-eyebrow">
-                TRIPOPT · {user?.is_pro ? "PRO" : "v1"}
-              </Text>
-              <Text style={styles.title} testID="screen-title">Optimise the whole trip.</Text>
-              <Text style={styles.subtitle}>
-                Any city → any city, ranked like a portfolio. Cheapest combined cost wins.
-              </Text>
+          {/* Top nav */}
+          <View style={styles.topbar}>
+            <View style={styles.brandRow}>
+              <View style={styles.logoDot}>
+                <LinearGradient
+                  colors={[...colors.gradAccent] as any}
+                  style={StyleSheet.absoluteFill}
+                />
+              </View>
+              <Text style={styles.brandText}>TRIPOPT</Text>
+              <View style={styles.brandTag}>
+                <Text style={styles.brandTagText}>{user?.is_pro ? "PRO" : "BETA"}</Text>
+              </View>
             </View>
             <View style={{ flexDirection: "row", gap: spacing.sm }}>
               {user ? (
-                <TouchableOpacity
-                  testID="open-alerts-btn"
-                  style={styles.savedBtn}
-                  onPress={() => router.push("/alerts")}
-                >
-                  <Ionicons name="notifications-outline" size={20} color={colors.ink} />
-                </TouchableOpacity>
+                <IconBtn icon="notifications-outline" onPress={() => router.push("/alerts")} testID="open-alerts-btn" />
               ) : null}
-              <TouchableOpacity
-                testID="open-saved-btn"
-                style={styles.savedBtn}
+              <IconBtn
+                icon={user ? "bookmark-outline" : "person-circle-outline"}
                 onPress={() => router.push(user ? "/saved" : "/login")}
+                testID="open-saved-btn"
+              />
+            </View>
+          </View>
+
+          <ScrollView
+            contentContainerStyle={[styles.scroll, isWide && styles.scrollWide]}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={[styles.heroLayout, isWide && styles.heroLayoutWide]}>
+              {/* LEFT: Hero copy + Globe */}
+              <Animated.View
+                entering={FadeInUp.duration(500)}
+                style={[styles.heroLeft, isWide && styles.heroLeftWide]}
               >
-                <Ionicons
-                  name={user ? "bookmark-outline" : "person-circle-outline"}
-                  size={20}
-                  color={colors.ink}
-                />
+                <View style={styles.eyebrowRow}>
+                  <View style={styles.dot} />
+                  <Text style={styles.eyebrow}>PORTFOLIO TRAVEL OPTIMISER</Text>
+                </View>
+                <Text style={styles.h1}>
+                  Optimise the <Text style={styles.h1Accent}>whole trip</Text>,
+                  not just the flight.
+                </Text>
+                <Text style={styles.heroSub}>
+                  Any city → any city. Flights + hotels + timing — ranked like
+                  a portfolio. Cheapest combined cost wins.
+                </Text>
+
+                <View style={styles.kpis}>
+                  <Kpi value="4,400+" label="Global airports" />
+                  <Kpi value="3" label="Trips per search" />
+                  <Kpi value="6h" label="Price refresh" />
+                </View>
+
+                {isWide && (
+                  <View style={styles.globeWrap} pointerEvents="none">
+                    <Globe size={520} />
+                  </View>
+                )}
+              </Animated.View>
+
+              {/* RIGHT: Glass card form */}
+              <Animated.View
+                entering={FadeInDown.duration(500).delay(100)}
+                style={[styles.cardWrap, isWide && styles.cardWrapWide]}
+              >
+                <View style={styles.glassCard}>
+                  <Text style={styles.cardTitle}>Plan a trip</Text>
+                  <Text style={styles.cardHint}>
+                    Tell us your budget — we'll hunt for the best total deal.
+                  </Text>
+
+                  <FieldLabel>FROM</FieldLabel>
+                  <FieldRow
+                    testID="departure-input"
+                    icon="airplane-outline"
+                    title={departureMeta ? `${departureMeta.city} (${departureMeta.code})` : "Pick airport"}
+                    sub={departureMeta ? `${departureMeta.name}${departureMeta.country ? ` · ${departureMeta.country}` : ""}` : "Any departure airport"}
+                    onPress={() => { setPickerSearch(""); setPickerOpen("departure"); }}
+                  />
+
+                  <FieldLabel>TO</FieldLabel>
+                  <FieldRow
+                    testID="destination-input"
+                    icon={destination ? "location-outline" : "globe-outline"}
+                    title={destination ? `${destinationMeta?.city ?? destination} (${destination})` : "Anywhere"}
+                    sub={destination ? destinationMeta?.country ?? "" : "Let the optimiser hunt globally"}
+                    accent={!destination}
+                    rightAdornment={destination ? (
+                      <Pressable
+                        testID="clear-destination-btn"
+                        onPress={() => setDestination(null)}
+                        hitSlop={8}
+                      >
+                        <Ionicons name="close-circle" size={18} color={colors.inkMuted} />
+                      </Pressable>
+                    ) : undefined}
+                    onPress={() => { setPickerSearch(""); setPickerOpen("destination"); }}
+                  />
+
+                  <FieldLabel>BUDGET (TOTAL TRIP)</FieldLabel>
+                  <View style={styles.budgetBox}>
+                    <Text style={styles.budgetValue} testID="budget-value">£{budget}</Text>
+                    <View style={styles.budgetPresets}>
+                      {[300, 500, 750, 1000, 1500].map((preset) => {
+                        const active = budget === preset;
+                        return (
+                          <Pressable
+                            key={preset}
+                            testID={`budget-preset-${preset}`}
+                            style={[styles.chip, active && styles.chipActive]}
+                            onPress={() => setBudget(preset)}
+                          >
+                            <Text style={[styles.chipText, active && styles.chipTextActive]}>£{preset}</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                    <Slider
+                      testID="budget-slider"
+                      style={{ marginTop: spacing.md }}
+                      minimumValue={150}
+                      maximumValue={2000}
+                      step={25}
+                      value={budget}
+                      onValueChange={(v) => setBudget(Math.round(v))}
+                      minimumTrackTintColor={colors.brand}
+                      maximumTrackTintColor={colors.borderStrong}
+                      thumbTintColor={colors.brand}
+                    />
+                    <View style={styles.rangeRow}>
+                      <Text style={styles.fieldHint}>£150</Text>
+                      <Text style={styles.fieldHint}>£2000</Text>
+                    </View>
+                  </View>
+
+                  <FieldLabel>NIGHTS</FieldLabel>
+                  <ChipRow testID="nights-row" options={[2, 3, 4, 5, 7, 10, 14]} value={tripLength} onChange={setTripLength} format={(v) => `${v}n`} />
+
+                  <FieldLabel>DATE FLEXIBILITY</FieldLabel>
+                  <ChipRow testID="flex-row" options={[0, 3, 7, 14]} value={flexibility} onChange={setFlexibility} format={(v) => (v === 0 ? "Fixed" : `±${v}d`)} />
+
+                  <FieldLabel>WEATHER</FieldLabel>
+                  <ChipRow testID="weather-row" options={["any", "sun", "city"] as const} value={weather} onChange={setWeather} format={(v) => (v === "any" ? "No preference" : v === "sun" ? "Sun" : "City")} />
+
+                  <FieldLabel>HOTEL STANDARD</FieldLabel>
+                  <ChipRow testID="hotel-row" options={["any", "budget", "mid"] as const} value={hotelPref} onChange={setHotelPref} format={(v) => (v === "any" ? "Any" : v === "budget" ? "Budget" : "Mid-range")} />
+
+                  {error ? <Text style={styles.error} testID="form-error">{error}</Text> : null}
+
+                  <Pressable
+                    testID="optimise-btn"
+                    style={({ pressed, hovered }: any) => [
+                      styles.cta,
+                      hovered && styles.ctaHover,
+                      pressed && { opacity: 0.85 },
+                      submitting && { opacity: 0.7 },
+                    ]}
+                    disabled={submitting}
+                    onPress={onOptimise}
+                  >
+                    <LinearGradient
+                      colors={[...colors.gradAccent] as any}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={StyleSheet.absoluteFill}
+                    />
+                    {submitting ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <>
+                        <Text style={styles.ctaText}>Optimise my trip</Text>
+                        <Ionicons name="arrow-forward" size={18} color="#fff" />
+                      </>
+                    )}
+                  </Pressable>
+
+                  <Text style={styles.disclaimer}>
+                    TripOpt searches flights + hotels across 80+ airports in your flexibility window.
+                    Prices are realistic estimates; affiliate links open the live booking site.
+                  </Text>
+                </View>
+              </Animated.View>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+
+      <Modal
+        visible={pickerOpen !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setPickerOpen(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.sheet}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>
+                {pickerOpen === "departure" ? "Departure airport" : "Destination"}
+              </Text>
+              <TouchableOpacity testID="close-picker-btn" onPress={() => setPickerOpen(null)}>
+                <Ionicons name="close" size={22} color={colors.ink} />
               </TouchableOpacity>
             </View>
-          </View>
-
-          {/* Departure */}
-          <FieldLabel>FROM</FieldLabel>
-          <TouchableOpacity
-            testID="departure-input"
-            style={styles.fieldRow}
-            onPress={() => {
-              setPickerSearch("");
-              setPickerOpen("departure");
-            }}
-          >
-            <Ionicons name="airplane-outline" size={20} color={colors.ink} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.fieldValue} numberOfLines={1}>
-                {departureMeta ? `${departureMeta.city} (${departureMeta.code})` : "Pick airport"}
-              </Text>
-              <Text style={styles.fieldHint}>
-                {departureMeta ? `${departureMeta.name}${departureMeta.country ? ` · ${departureMeta.country}` : ""}` : "Any departure airport"}
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.inkMuted} />
-          </TouchableOpacity>
-
-          {/* Destination */}
-          <FieldLabel>TO</FieldLabel>
-          <TouchableOpacity
-            testID="destination-input"
-            style={[styles.fieldRow, !destination && styles.fieldRowAnywhere]}
-            onPress={() => {
-              setPickerSearch("");
-              setPickerOpen("destination");
-            }}
-          >
-            <Ionicons
-              name={destination ? "location-outline" : "globe-outline"}
-              size={20}
-              color={destination ? colors.ink : colors.riskLow}
+            <TextInput
+              ref={searchInputRef}
+              testID="picker-search"
+              style={styles.search}
+              placeholder={pickerOpen === "departure" ? "Search city, country or IATA…" : "Search destination, country or IATA…"}
+              placeholderTextColor={colors.inkMuted}
+              value={pickerSearch}
+              onChangeText={setPickerSearch}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="search"
             />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.fieldValue} numberOfLines={1}>
-                {destination
-                  ? `${destinationMeta?.city ?? destination} (${destination})`
-                  : "Anywhere"}
-              </Text>
-              <Text style={styles.fieldHint}>
-                {destination ? destinationMeta?.country : "Let the optimiser hunt the best deal globally"}
-              </Text>
-            </View>
-            {destination && (
-              <Pressable
-                testID="clear-destination-btn"
-                onPress={() => setDestination(null)}
-                hitSlop={8}
+            {pickerLoading && pickerSearch.length > 0 ? (
+              <Text style={styles.searchHint}>Searching…</Text>
+            ) : null}
+            {pickerOpen === "destination" && (
+              <TouchableOpacity
+                testID="anywhere-option"
+                style={styles.anywhereRow}
+                onPress={() => { setDestination(null); setPickerOpen(null); }}
               >
-                <Ionicons name="close-circle" size={18} color={colors.inkMuted} />
-              </Pressable>
+                <Ionicons name="globe-outline" size={20} color={colors.brand} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.fieldValue}>Anywhere</Text>
+                  <Text style={styles.fieldHint}>Let the optimiser hunt globally</Text>
+                </View>
+              </TouchableOpacity>
             )}
-            <Ionicons
-              name="chevron-forward"
-              size={18}
-              color={colors.inkMuted}
-              style={{ marginLeft: spacing.sm }}
-            />
-          </TouchableOpacity>
-
-          {/* Budget */}
-          <FieldLabel>BUDGET (TOTAL TRIP)</FieldLabel>
-          <View style={styles.fieldBox}>
-            <Text style={styles.budgetValue} testID="budget-value">£{budget}</Text>
-            <View style={styles.budgetPresets}>
-              {[300, 500, 750, 1000, 1500].map((preset) => {
-                const active = budget === preset;
-                return (
-                  <TouchableOpacity
-                    key={preset}
-                    testID={`budget-preset-${preset}`}
-                    style={[styles.budgetChip, active && styles.budgetChipActive]}
-                    onPress={() => setBudget(preset)}
-                  >
-                    <Text style={[styles.budgetChipText, active && styles.budgetChipTextActive]}>
-                      £{preset}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            <Slider
-              testID="budget-slider"
-              style={{ marginTop: spacing.md }}
-              minimumValue={150}
-              maximumValue={2000}
-              step={25}
-              value={budget}
-              onValueChange={(v) => setBudget(Math.round(v))}
-              minimumTrackTintColor={colors.ink}
-              maximumTrackTintColor={colors.border}
-              thumbTintColor={colors.ink}
-            />
-            <View style={styles.rangeRow}>
-              <Text style={styles.fieldHint}>£150</Text>
-              <Text style={styles.fieldHint}>£2000</Text>
-            </View>
-          </View>
-
-          {/* Trip length */}
-          <FieldLabel>NIGHTS</FieldLabel>
-          <ChipRow
-            testID="nights-row"
-            options={[2, 3, 4, 5, 7, 10, 14]}
-            value={tripLength}
-            onChange={setTripLength}
-            format={(v) => `${v}n`}
-          />
-
-          {/* Flexibility */}
-          <FieldLabel>DATE FLEXIBILITY</FieldLabel>
-          <ChipRow
-            testID="flex-row"
-            options={[0, 3, 7, 14]}
-            value={flexibility}
-            onChange={setFlexibility}
-            format={(v) => (v === 0 ? "Fixed" : `±${v}d`)}
-          />
-
-          {/* Weather */}
-          <FieldLabel>WEATHER</FieldLabel>
-          <ChipRow
-            testID="weather-row"
-            options={["any", "sun", "city"] as const}
-            value={weather}
-            onChange={setWeather}
-            format={(v) => (v === "any" ? "No preference" : v === "sun" ? "Sun" : "City")}
-          />
-
-          {/* Hotel standard */}
-          <FieldLabel>HOTEL STANDARD</FieldLabel>
-          <ChipRow
-            testID="hotel-row"
-            options={["any", "budget", "mid"] as const}
-            value={hotelPref}
-            onChange={setHotelPref}
-            format={(v) =>
-              v === "any" ? "Any" : v === "budget" ? "Budget" : "Mid-range"
-            }
-          />
-
-          {error ? <Text style={styles.error} testID="form-error">{error}</Text> : null}
-
-          <TouchableOpacity
-            testID="optimise-btn"
-            style={[styles.cta, submitting && { opacity: 0.7 }]}
-            disabled={submitting}
-            onPress={onOptimise}
-          >
-            {submitting ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Text style={styles.ctaText}>Optimise my trip</Text>
-                <Ionicons name="arrow-forward" size={18} color="#fff" />
-              </>
-            )}
-          </TouchableOpacity>
-
-          <Text style={styles.disclaimer}>
-            TripOpt searches flights + hotels across 80+ airports in your flexibility window
-            and ranks the best combined-price trips. Prices shown are realistic estimates;
-            affiliate links open the live booking site.
-          </Text>
-        </ScrollView>
-
-        <Modal
-          visible={pickerOpen !== null}
-          animationType="slide"
-          transparent
-          onRequestClose={() => setPickerOpen(null)}
-        >
-          <View style={styles.modalBackdrop}>
-            <View style={styles.sheet}>
-              <View style={styles.sheetHandle} />
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>
-                  {pickerOpen === "departure" ? "Departure airport" : "Destination"}
-                </Text>
-                <TouchableOpacity
-                  testID="close-picker-btn"
-                  onPress={() => setPickerOpen(null)}
-                >
-                  <Ionicons name="close" size={22} color={colors.ink} />
-                </TouchableOpacity>
-              </View>
-              <TextInput
-                ref={searchInputRef}
-                testID="picker-search"
-                style={styles.search}
-                placeholder={pickerOpen === "departure" ? "Search city, country or IATA…" : "Search destination, country or IATA…"}
-                placeholderTextColor={colors.inkMuted}
-                value={pickerSearch}
-                onChangeText={setPickerSearch}
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="search"
-              />
-              {pickerLoading && pickerSearch.length > 0 ? (
-                <Text style={styles.searchHint}>Searching…</Text>
-              ) : null}
-              {pickerOpen === "destination" && (
-                <TouchableOpacity
-                  testID="anywhere-option"
-                  style={styles.anywhereRow}
-                  onPress={() => {
-                    setDestination(null);
-                    setPickerOpen(null);
-                  }}
-                >
-                  <Ionicons name="globe-outline" size={20} color={colors.brand} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.fieldValue}>Anywhere</Text>
-                    <Text style={styles.fieldHint}>Let the optimiser hunt globally</Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-              <FlatList
-                data={filteredPickerData}
-                keyExtractor={(item: any) => item.code}
-                keyboardShouldPersistTaps="handled"
-                ListHeaderComponent={
-                  pickerSearch.trim().length === 0 ? (
-                    <RecentRow
-                      codes={pickerOpen === "departure" ? recentDep : recentDest}
-                      airportsByCode={pickerResults}
-                      onPick={async (code) => {
-                        if (pickerOpen === "departure") {
-                          setDeparture(code);
-                          await pushRecent(RECENT_DEP_KEY, code);
-                          setRecentDep(await loadRecent(RECENT_DEP_KEY));
-                        } else {
-                          setDestination(code);
-                          await pushRecent(RECENT_DEST_KEY, code);
-                          setRecentDest(await loadRecent(RECENT_DEST_KEY));
-                        }
-                        setPickerOpen(null);
-                      }}
-                    />
-                  ) : null
-                }
-                ListEmptyComponent={
-                  pickerLoading ? null : (
-                    <Text style={styles.noResults} testID="picker-no-results">
-                      No airports match "{pickerSearch}". Try a different city, country, or 3-letter IATA code.
-                    </Text>
-                  )
-                }
-                renderItem={({ item }: any) => (
-                  <TouchableOpacity
-                    testID={`picker-item-${item.code}`}
-                    style={styles.pickerRow}
-                    onPress={async () => {
+            <FlatList
+              data={pickerResults}
+              keyExtractor={(item: any) => item.code}
+              keyboardShouldPersistTaps="handled"
+              ListHeaderComponent={
+                pickerSearch.trim().length === 0 ? (
+                  <RecentRow
+                    codes={pickerOpen === "departure" ? recentDep : recentDest}
+                    airportsByCode={pickerResults}
+                    onPick={async (code) => {
                       if (pickerOpen === "departure") {
-                        setDeparture(item.code);
-                        await pushRecent(RECENT_DEP_KEY, item.code);
+                        setDeparture(code);
+                        await pushRecent(RECENT_DEP_KEY, code);
                         setRecentDep(await loadRecent(RECENT_DEP_KEY));
                       } else {
-                        setDestination(item.code);
-                        await pushRecent(RECENT_DEST_KEY, item.code);
+                        setDestination(code);
+                        await pushRecent(RECENT_DEST_KEY, code);
                         setRecentDest(await loadRecent(RECENT_DEST_KEY));
                       }
                       setPickerOpen(null);
                     }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.pickerCity}>
-                        {item.city}
-                        {item.country ? `, ${item.country}` : ""}
-                      </Text>
-                      <Text style={styles.pickerSub}>
-                        {item.name || (item as any).region || ""}
-                      </Text>
-                    </View>
-                    <Text style={styles.pickerCode}>{item.code}</Text>
-                  </TouchableOpacity>
-                )}
-              />
-            </View>
+                  />
+                ) : null
+              }
+              ListEmptyComponent={
+                pickerLoading ? null : (
+                  <Text style={styles.noResults} testID="picker-no-results">
+                    No airports match "{pickerSearch}". Try a different city, country, or 3-letter IATA code.
+                  </Text>
+                )
+              }
+              renderItem={({ item }: any) => (
+                <TouchableOpacity
+                  testID={`picker-item-${item.code}`}
+                  style={styles.pickerRow}
+                  onPress={async () => {
+                    if (pickerOpen === "departure") {
+                      setDeparture(item.code);
+                      await pushRecent(RECENT_DEP_KEY, item.code);
+                      setRecentDep(await loadRecent(RECENT_DEP_KEY));
+                    } else {
+                      setDestination(item.code);
+                      await pushRecent(RECENT_DEST_KEY, item.code);
+                      setRecentDest(await loadRecent(RECENT_DEST_KEY));
+                    }
+                    setPickerOpen(null);
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.pickerCity}>
+                      {item.city}{item.country ? `, ${item.country}` : ""}
+                    </Text>
+                    <Text style={styles.pickerSub}>
+                      {item.name || (item as any).region || ""}
+                    </Text>
+                  </View>
+                  <Text style={styles.pickerCode}>{item.code}</Text>
+                </TouchableOpacity>
+              )}
+            />
           </View>
-        </Modal>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+function IconBtn({ icon, onPress, testID }: { icon: any; onPress: () => void; testID?: string }) {
+  return (
+    <Pressable
+      testID={testID}
+      onPress={onPress}
+      style={({ hovered }: any) => [styles.iconBtn, hovered && styles.iconBtnHover]}
+    >
+      <Ionicons name={icon} size={18} color={colors.ink} />
+    </Pressable>
+  );
+}
+
+function FieldRow({
+  icon, title, sub, accent, rightAdornment, onPress, testID,
+}: {
+  icon: any; title: string; sub: string; accent?: boolean;
+  rightAdornment?: React.ReactNode; onPress: () => void; testID?: string;
+}) {
+  return (
+    <Pressable
+      testID={testID}
+      onPress={onPress}
+      style={({ hovered }: any) => [
+        styles.fieldRow,
+        accent && styles.fieldRowAccent,
+        hovered && styles.fieldRowHover,
+      ]}
+    >
+      <Ionicons name={icon} size={20} color={accent ? colors.brand : colors.ink} />
+      <View style={{ flex: 1 }}>
+        <Text style={styles.fieldValue} numberOfLines={1}>{title}</Text>
+        <Text style={styles.fieldHint} numberOfLines={1}>{sub}</Text>
+      </View>
+      {rightAdornment}
+      <Ionicons name="chevron-forward" size={18} color={colors.inkMuted} style={{ marginLeft: spacing.sm }} />
+    </Pressable>
   );
 }
 
@@ -505,17 +524,19 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   return <Text style={styles.fieldLabel}>{children}</Text>;
 }
 
+function Kpi({ value, label }: { value: string; label: string }) {
+  return (
+    <View style={styles.kpi}>
+      <Text style={styles.kpiValue}>{value}</Text>
+      <Text style={styles.kpiLabel}>{label}</Text>
+    </View>
+  );
+}
+
 function RecentRow({
-  codes,
-  airportsByCode,
-  onPick,
-}: {
-  codes: string[];
-  airportsByCode: Airport[];
-  onPick: (code: string) => void;
-}) {
+  codes, airportsByCode, onPick,
+}: { codes: string[]; airportsByCode: Airport[]; onPick: (code: string) => void; }) {
   if (!codes.length) return null;
-  // Resolve codes to airports from the current pool (popular set when empty query).
   const byCode: Record<string, Airport> = {};
   for (const a of airportsByCode) byCode[a.code] = a;
   const items = codes.map((c) => byCode[c]).filter(Boolean) as Airport[];
@@ -541,38 +562,33 @@ function RecentRow({
 }
 
 function ChipRow<T>({
-  options,
-  value,
-  onChange,
-  format,
-  testID,
+  options, value, onChange, format, testID,
 }: {
-  options: readonly T[];
-  value: T;
-  onChange: (v: T) => void;
-  format: (v: T) => string;
-  testID?: string;
+  options: readonly T[]; value: T; onChange: (v: T) => void;
+  format: (v: T) => string; testID?: string;
 }) {
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.chipRow}
+      contentContainerStyle={styles.chipScrollRow}
       testID={testID}
     >
       {options.map((opt) => {
         const active = opt === value;
         return (
-          <TouchableOpacity
+          <Pressable
             key={String(opt)}
             testID={`${testID}-${String(opt)}`}
-            style={[styles.chip, active && styles.chipActive]}
+            style={({ hovered }: any) => [
+              styles.chip,
+              active && styles.chipActive,
+              hovered && !active && styles.chipHover,
+            ]}
             onPress={() => onChange(opt)}
           >
-            <Text style={[styles.chipText, active && styles.chipTextActive]}>
-              {format(opt)}
-            </Text>
-          </TouchableOpacity>
+            <Text style={[styles.chipText, active && styles.chipTextActive]}>{format(opt)}</Text>
+          </Pressable>
         );
       })}
     </ScrollView>
@@ -580,241 +596,205 @@ function ChipRow<T>({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg },
-  scroll: { padding: spacing.lg, paddingBottom: spacing.xxxl },
-  header: {
+  root: { flex: 1, backgroundColor: colors.bg },
+  topbar: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    marginBottom: spacing.xl,
-    gap: spacing.md,
-  },
-  eyebrow: {
-    fontSize: 11,
-    letterSpacing: 2,
-    color: colors.inkMuted,
-    fontWeight: "700",
-    marginBottom: spacing.sm,
-  },
-  title: {
-    fontSize: 32,
-    lineHeight: 36,
-    color: colors.ink,
-    fontWeight: "900",
-    letterSpacing: -1,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: colors.inkSecondary,
-    marginTop: spacing.sm,
-    lineHeight: 20,
-  },
-  savedBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
   },
+  brandRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  logoDot: {
+    width: 24, height: 24, borderRadius: 6,
+    overflow: "hidden",
+  },
+  brandText: {
+    color: colors.ink, fontWeight: "900", fontSize: 16, letterSpacing: 2,
+  },
+  brandTag: {
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+  },
+  brandTagText: {
+    color: colors.brandStrong, fontSize: 9, fontWeight: "900", letterSpacing: 1.5,
+  },
+  iconBtn: {
+    width: 40, height: 40, borderRadius: 12,
+    borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: "center", justifyContent: "center",
+  },
+  iconBtnHover: { backgroundColor: colors.surfaceHover, borderColor: colors.borderStrong },
+  scroll: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl, gap: spacing.xl },
+  scrollWide: { paddingHorizontal: spacing.xxxl, alignItems: "center" },
+  heroLayout: { gap: spacing.xl, width: "100%" },
+  heroLayoutWide: {
+    flexDirection: "row",
+    gap: spacing.xxxl,
+    maxWidth: 1280,
+    alignItems: "flex-start",
+  },
+  heroLeft: { gap: spacing.lg, paddingTop: spacing.lg },
+  heroLeftWide: { flex: 1.1, paddingTop: spacing.xxxl, position: "relative", minHeight: 700 },
+  eyebrowRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.brand },
+  eyebrow: {
+    color: colors.brandStrong, fontSize: 11, letterSpacing: 2.4, fontWeight: "800",
+  },
+  h1: {
+    color: colors.ink, fontSize: 44, lineHeight: 50, fontWeight: "900", letterSpacing: -1.5,
+  },
+  h1Accent: { color: colors.brand },
+  heroSub: {
+    color: colors.inkSecondary, fontSize: 16, lineHeight: 24, maxWidth: 520,
+  },
+  kpis: { flexDirection: "row", gap: spacing.lg, marginTop: spacing.md, flexWrap: "wrap" },
+  kpi: {
+    paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+    borderRadius: radii.md, backgroundColor: colors.surface,
+    borderWidth: 1, borderColor: colors.border, minWidth: 120,
+  },
+  kpiValue: { color: colors.ink, fontWeight: "900", fontSize: 20, letterSpacing: -0.5 },
+  kpiLabel: { color: colors.inkMuted, fontSize: 11, fontWeight: "700", letterSpacing: 1.4, marginTop: 2 },
+  globeWrap: {
+    position: "absolute", left: -80, bottom: -80,
+    opacity: 0.85,
+  },
+
+  cardWrap: { width: "100%" },
+  cardWrapWide: { flex: 1, maxWidth: 540 },
+  glassCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    borderWidth: 1, borderColor: colors.border,
+    padding: spacing.xl,
+    gap: spacing.xs,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.4,
+    shadowRadius: 28,
+    elevation: 12,
+  },
+  cardTitle: { color: colors.ink, fontSize: 22, fontWeight: "900", letterSpacing: -0.5 },
+  cardHint: { color: colors.inkSecondary, fontSize: 13, marginBottom: spacing.md },
+
   fieldLabel: {
-    fontSize: 11,
-    letterSpacing: 1.6,
-    color: colors.inkMuted,
-    fontWeight: "700",
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
+    fontSize: 10, letterSpacing: 1.8, color: colors.inkMuted,
+    fontWeight: "800", marginTop: spacing.lg, marginBottom: spacing.sm,
   },
   fieldRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    height: 64,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.bg,
+    flexDirection: "row", alignItems: "center", gap: spacing.md,
+    paddingHorizontal: spacing.lg, height: 64, borderRadius: radii.lg,
+    borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.surfaceStrong,
   },
-  fieldRowAnywhere: {
-    borderColor: colors.riskLow,
-    backgroundColor: colors.riskLowBg,
-  },
-  fieldBox: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.bg,
-  },
-  fieldValue: { fontSize: 16, fontWeight: "700", color: colors.ink },
+  fieldRowHover: { borderColor: colors.borderStrong, backgroundColor: colors.surfaceHover },
+  fieldRowAccent: { borderColor: colors.borderGlow, backgroundColor: colors.riskLowBg },
+  fieldValue: { fontSize: 15, fontWeight: "700", color: colors.ink },
   fieldHint: { fontSize: 12, color: colors.inkMuted, marginTop: 2 },
+
+  budgetBox: {
+    paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+    borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.surfaceStrong,
+  },
   budgetValue: {
-    fontSize: 36,
-    fontWeight: "900",
-    color: colors.ink,
-    letterSpacing: -1.2,
+    fontSize: 40, fontWeight: "900", color: colors.ink, letterSpacing: -1.5,
   },
   budgetPresets: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm,
-    marginTop: spacing.md,
+    flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md,
   },
-  budgetChip: {
-    paddingHorizontal: spacing.md,
-    height: 36,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  budgetChipActive: {
-    backgroundColor: colors.ink,
-    borderColor: colors.ink,
-  },
-  budgetChipText: { fontSize: 13, fontWeight: "800", color: colors.ink },
-  budgetChipTextActive: { color: "#fff" },
-  rangeRow: { flexDirection: "row", justifyContent: "space-between" },
-  chipRow: { gap: spacing.sm, paddingVertical: 2 },
+  rangeRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 4 },
+
+  chipScrollRow: { gap: spacing.sm, paddingVertical: 2 },
   chip: {
-    paddingHorizontal: spacing.lg,
-    height: 40,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
+    paddingHorizontal: spacing.lg, height: 38, borderRadius: radii.pill,
+    borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: "center", justifyContent: "center",
   },
-  chipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
+  chipActive: { backgroundColor: colors.brand, borderColor: colors.brand },
+  chipHover: { borderColor: colors.borderStrong, backgroundColor: colors.surfaceHover },
   chipText: { fontSize: 13, fontWeight: "700", color: colors.ink },
   chipTextActive: { color: "#fff" },
+
   cta: {
-    marginTop: spacing.xl,
-    height: 56,
-    borderRadius: radii.lg,
-    backgroundColor: colors.ink,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: spacing.sm,
+    marginTop: spacing.xl, height: 56, borderRadius: radii.lg,
+    alignItems: "center", justifyContent: "center", flexDirection: "row",
+    gap: spacing.sm, overflow: "hidden",
+    shadowColor: colors.brand,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  ctaText: { color: "#fff", fontWeight: "800", fontSize: 16, letterSpacing: -0.2 },
+  ctaHover: { transform: [{ translateY: -1 }] },
+  ctaText: { color: "#fff", fontWeight: "800", fontSize: 16, letterSpacing: 0.2 },
+
   disclaimer: {
-    fontSize: 11,
-    color: colors.inkMuted,
-    textAlign: "center",
-    marginTop: spacing.lg,
-    lineHeight: 16,
+    fontSize: 11, color: colors.inkMuted, textAlign: "center",
+    marginTop: spacing.lg, lineHeight: 16,
   },
-  error: {
-    color: "#DC2626",
-    fontSize: 13,
-    marginTop: spacing.md,
-    textAlign: "center",
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(15,23,42,0.4)",
-    justifyContent: "flex-end",
-  },
+  error: { color: colors.danger, fontSize: 13, marginTop: spacing.md, textAlign: "center" },
+
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(5,7,15,0.7)", justifyContent: "flex-end" },
   sheet: {
-    backgroundColor: colors.bg,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xl,
-    maxHeight: "85%",
+    backgroundColor: colors.bgAlt,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: spacing.lg, paddingTop: spacing.sm,
+    paddingBottom: spacing.xl, maxHeight: "85%",
   },
   sheetHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.borderStrong,
-    alignSelf: "center",
-    marginBottom: spacing.md,
+    width: 36, height: 4, borderRadius: 2,
+    backgroundColor: colors.borderStrong, alignSelf: "center", marginBottom: spacing.md,
   },
   sheetHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: spacing.md,
+    flexDirection: "row", justifyContent: "space-between",
+    alignItems: "center", marginBottom: spacing.md,
   },
   sheetTitle: { fontSize: 18, fontWeight: "800", color: colors.ink },
   search: {
-    height: 48,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.md,
-    fontSize: 14,
-    color: colors.ink,
-    marginBottom: spacing.sm,
+    height: 48, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border,
+    paddingHorizontal: spacing.md, fontSize: 14, color: colors.ink, marginBottom: spacing.sm,
+    backgroundColor: colors.surface,
   },
   anywhereRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    flexDirection: "row", alignItems: "center", gap: spacing.md,
+    paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border,
   },
   pickerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    flexDirection: "row", alignItems: "center", paddingVertical: spacing.md,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
   },
   pickerCity: { fontSize: 15, fontWeight: "700", color: colors.ink },
   pickerSub: { fontSize: 12, color: colors.inkMuted, marginTop: 2 },
   pickerCode: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: colors.brand,
-    letterSpacing: 1,
+    fontSize: 13, fontWeight: "800", color: colors.brand, letterSpacing: 1,
   },
   searchHint: {
-    fontSize: 11,
-    color: colors.inkMuted,
-    fontWeight: "700",
-    letterSpacing: 1,
-    marginBottom: spacing.sm,
+    fontSize: 11, color: colors.inkMuted, fontWeight: "700",
+    letterSpacing: 1, marginBottom: spacing.sm,
   },
   recentBox: {
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border,
     marginBottom: spacing.sm,
   },
   recentTitle: {
-    fontSize: 10,
-    color: colors.inkMuted,
-    fontWeight: "800",
-    letterSpacing: 1.6,
-    marginBottom: spacing.sm,
+    fontSize: 10, color: colors.inkMuted, fontWeight: "800",
+    letterSpacing: 1.6, marginBottom: spacing.sm,
   },
   recentChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    maxWidth: 160,
+    paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radii.pill,
+    borderWidth: 1, borderColor: colors.borderStrong,
+    flexDirection: "row", alignItems: "center", gap: 6, maxWidth: 160,
+    backgroundColor: colors.surface,
   },
   recentChipCode: { fontSize: 11, fontWeight: "900", color: colors.brand, letterSpacing: 1 },
   recentChipCity: { fontSize: 12, color: colors.ink, flexShrink: 1 },
   noResults: {
-    fontSize: 13,
-    color: colors.inkSecondary,
-    paddingVertical: spacing.lg,
-    textAlign: "center",
+    fontSize: 13, color: colors.inkSecondary,
+    paddingVertical: spacing.lg, textAlign: "center",
   },
 });

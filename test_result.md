@@ -101,3 +101,87 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: |
+  Migrate TripOpt to a stunning web-first dark navy cinematic UI (Linear/Stripe vibes meets travel)
+  while keeping it on the existing Expo + FastAPI + MongoDB stack.
+  Features requested:
+  - Cinematic dark navy hero with bold display typography
+  - Globe-style hero on Search with form floating in glass card on the right (responsive)
+  - Sticky verdict banner + 3-column trip card grid with hover lifts and animated price reveals
+  - Trip Detail: big hero price, smooth SVG sparkline (instead of bars), 3-col flight/hotel/why grid, sticky booking bar
+  - Smooth route transitions and hover effects
+  - Help with deployment when ready
+
+frontend:
+  - task: "Cinematic dark navy theme + responsive home (globe + glass card)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/theme.ts, /app/frontend/app/index.tsx, /app/frontend/src/components/Globe.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Replaced light Swiss theme with dark navy Linear/Stripe palette. Home now uses LinearGradient backdrop, custom SVG glowing-globe component, side-by-side hero + glass-card form on >=960px (stacked on mobile). Form uses electric-blue accents and gradient CTA."
+
+  - task: "Results page sticky verdict + 3-column trip card grid with rank-coloured accents"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/results.tsx, /app/frontend/src/components/HoverCard.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Verdict banner uses dark elevated bg with subtle blue glow + readable typography. Grid is 3-column on wide (width: 31.5%) with FadeInDown stagger and HoverCard lift effect (Reanimated)."
+
+  - task: "Trip detail: smooth SVG sparkline + 3-col grid + sticky gradient booking bar"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/trip/[id].tsx, /app/frontend/src/components/Sparkline.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Sparkline uses Catmull-Rom -> Bezier cubic interpolation for smooth curves, area gradient fill on history portion, dashed forecast line, today marker dot. Hero is two-column on wide. 3-col detail grid (Flight / Hotel / Why). Sticky bar with gradient 'Book hotel' CTA."
+
+backend:
+  - task: "Existing TripOpt backend (optimizer, airports, auth, payments, scheduler)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "No backend changes in this UI overhaul. Verified /api/optimize still returns 200 in screenshot session."
+
+metadata:
+  created_by: "main_agent"
+  version: "2.0"
+  test_sequence: 0
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Cinematic dark navy theme + responsive home (globe + glass card)"
+    - "Results page sticky verdict + 3-column trip card grid with rank-coloured accents"
+    - "Trip detail: smooth SVG sparkline + 3-col grid + sticky gradient booking bar"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Major visual overhaul shipped. All three primary screens (Home, Results, Trip Detail)
+      converted to cinematic dark navy with Linear/Stripe vibes. Backend untouched. Login,
+      upgrade, loading screens get the new accent automatically via theme tokens.
+      Pending user choice: deploy now or test more pages first.

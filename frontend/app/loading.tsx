@@ -130,7 +130,7 @@ export default function LoadingScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.brand },
+  safe: { flex: 1, backgroundColor: colors.bg },
   center: {
     flex: 1,
     paddingHorizontal: spacing.xl,
@@ -169,8 +169,8 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: "#1E293B",
-    backgroundColor: "#0B1424",
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     gap: spacing.md,
   },
   stageRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
