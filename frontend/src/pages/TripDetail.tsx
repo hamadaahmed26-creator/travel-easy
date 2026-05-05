@@ -218,7 +218,7 @@ export default function TripDetailPage() {
         <section className="relative bg-navy-950 text-white overflow-hidden">
           <div className="absolute inset-0 gradient-mesh opacity-90" />
           <div className="absolute inset-0 grid-bg opacity-50" />
-          <div className="relative max-w-[1280px] mx-auto px-8 py-12 lg:py-16">
+          <div className="relative max-w-[1280px] mx-auto px-4 md:px-8 py-8 md:py-12 lg:py-16">
             <button
               onClick={() => navigate(-1)}
               data-testid="trip-back-btn"
@@ -228,24 +228,24 @@ export default function TripDetailPage() {
               BACK
             </button>
 
-            <div className="mt-6 grid lg:grid-cols-12 gap-12 items-end">
+            <div className="mt-4 md:mt-6 grid lg:grid-cols-12 gap-6 md:gap-12 items-end">
               <div className="lg:col-span-7">
                 <div className="label-eyebrow text-white/60">{trip.rank_label.toUpperCase()}</div>
-                <h1 className="mt-3 text-5xl lg:text-7xl font-black tracking-[-0.04em] leading-[0.95]">
+                <h1 className="mt-2 md:mt-3 text-4xl md:text-5xl lg:text-7xl font-black tracking-[-0.04em] leading-[0.95]">
                   {cap(trip.destination_city)}
                   <span className="text-white/50">, {trip.destination_country}</span>
                 </h1>
-                <div className="mt-4 flex flex-wrap items-center gap-3 text-[14px]">
-                  <span className="inline-flex items-center gap-2 px-3 h-8 rounded-full bg-white/10 border border-white/10">
+                <div className="mt-3 md:mt-4 flex flex-wrap items-center gap-2 md:gap-3 text-[12px] md:text-[14px]">
+                  <span className="inline-flex items-center gap-2 px-2.5 md:px-3 h-7 md:h-8 rounded-full bg-white/10 border border-white/10">
                     <Plane size={12} /> {trip.departure}
                     <span className="text-white/40">→</span>
                     {trip.destination}
                   </span>
-                  <span className="inline-flex items-center gap-2 px-3 h-8 rounded-full bg-white/10 border border-white/10">
+                  <span className="inline-flex items-center gap-2 px-2.5 md:px-3 h-7 md:h-8 rounded-full bg-white/10 border border-white/10">
                     <CalendarDays size={12} />
                     {fmtRange(trip.check_in, trip.check_out)} · {trip.nights}n
                   </span>
-                  <span className="inline-flex items-center gap-2 px-3 h-8 rounded-full bg-white/10 border border-white/10 capitalize">
+                  <span className="inline-flex items-center gap-2 px-2.5 md:px-3 h-7 md:h-8 rounded-full bg-white/10 border border-white/10 capitalize">
                     {trip.weather}
                   </span>
                 </div>
@@ -256,12 +256,12 @@ export default function TripDetailPage() {
                   TOTAL TRIP COST
                 </div>
                 <div
-                  className="mt-2 text-7xl lg:text-8xl font-black tracking-[-0.05em] leading-none bg-gradient-to-br from-white via-white to-white/60 bg-clip-text text-transparent"
+                  className="mt-1 md:mt-2 text-5xl md:text-7xl lg:text-8xl font-black tracking-[-0.05em] leading-none bg-gradient-to-br from-white via-white to-white/60 bg-clip-text text-transparent"
                   data-testid="trip-total-price"
                 >
                   {formatGBP(trip.total_price)}
                 </div>
-                <div className="mt-3 text-[13px] text-white/60">
+                <div className="mt-2 md:mt-3 text-[12px] md:text-[13px] text-white/60">
                   Median for window: <span className="text-white">{formatGBP(trip.total_price + trip.savings_vs_budget)}</span>
                 </div>
               </div>
@@ -270,8 +270,8 @@ export default function TripDetailPage() {
         </section>
 
         {/* Verdict + chart */}
-        <section className="max-w-[1280px] mx-auto px-8 -mt-12 relative z-10">
-          <div className="grid lg:grid-cols-12 gap-6">
+        <section className="max-w-[1280px] mx-auto px-4 md:px-8 -mt-8 md:-mt-12 relative z-10">
+          <div className="grid lg:grid-cols-12 gap-4 md:gap-6">
             <div className="lg:col-span-5">
               <div className="rounded-3xl border border-ink/10 bg-white shadow-card p-7 h-full flex flex-col">
                 <div className="flex items-center gap-2">
@@ -399,8 +399,8 @@ export default function TripDetailPage() {
         </section>
 
         {/* Components: flight + hotel + why */}
-        <section className="max-w-[1280px] mx-auto px-8 mt-8">
-          <div className="grid lg:grid-cols-3 gap-6">
+        <section className="max-w-[1280px] mx-auto px-4 md:px-8 mt-4 md:mt-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             <Component
               icon={<Plane size={18} />}
               title="Flight"
@@ -479,77 +479,157 @@ export default function TripDetailPage() {
         {/* Sticky bottom action bar */}
         <div className="fixed bottom-0 left-0 right-0 z-30">
           <div className="backdrop-blur-md bg-white/85 border-t border-ink/[0.08]">
-            <div className="max-w-[1280px] mx-auto px-8 py-4 flex flex-wrap items-center gap-3">
-              <div className="flex items-baseline gap-2 mr-2">
-                <span className="text-2xl font-black tracking-[-0.03em]">{formatGBP(trip.total_price)}</span>
-                <span className="text-[12px] text-ink-muted font-semibold">total</span>
+            <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-3 md:py-4">
+              {/* Mobile: Two rows */}
+              <div className="flex md:hidden flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-xl font-black tracking-[-0.03em]">{formatGBP(trip.total_price)}</span>
+                    <span className="text-[11px] text-ink-muted font-semibold">total</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      data-testid="trip-share-btn-mobile"
+                      onClick={onShare}
+                      className="icon-btn w-9 h-9"
+                      aria-label="Share"
+                    >
+                      <Share2 size={14} />
+                    </button>
+                    {savedId ? (
+                      <button
+                        data-testid="trip-remove-btn-mobile"
+                        onClick={onDelete}
+                        className="icon-btn w-9 h-9 text-red-500 border-red-200"
+                        aria-label="Remove"
+                        disabled={busy === 'delete'}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    ) : (
+                      <button
+                        data-testid="trip-save-btn-mobile"
+                        onClick={onSave}
+                        className="icon-btn w-9 h-9"
+                        disabled={busy === 'save'}
+                        aria-label="Save"
+                      >
+                        <Bookmark size={14} />
+                      </button>
+                    )}
+                    <button
+                      data-testid="trip-watch-btn-mobile"
+                      onClick={onWatch}
+                      disabled={busy === 'watch'}
+                      className={cn(
+                        'inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-lg border text-[12px] font-bold transition-colors',
+                        watching
+                          ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                          : 'bg-white border-ink/10',
+                      )}
+                    >
+                      {watching ? <Bell size={12} /> : <BellOff size={12} />}
+                      {watching ? 'On' : 'Watch'}
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <a
+                    href={trip.affiliate_flight_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    data-testid="trip-book-flight-btn-mobile"
+                    className="btn-light h-10 text-[12px]"
+                  >
+                    <Plane size={14} />
+                    Book flight
+                  </a>
+                  <a
+                    href={trip.affiliate_hotel_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    data-testid="trip-book-hotel-btn-mobile"
+                    className="btn-primary h-10 text-[12px]"
+                  >
+                    <Hotel size={14} />
+                    Book hotel
+                  </a>
+                </div>
               </div>
-              <div className="flex-1 hidden md:block" />
-              <button
-                data-testid="trip-share-btn"
-                onClick={onShare}
-                className="icon-btn"
-                aria-label="Share"
-              >
-                <Share2 size={16} />
-              </button>
-              {savedId ? (
+              
+              {/* Desktop: Single row */}
+              <div className="hidden md:flex flex-wrap items-center gap-3">
+                <div className="flex items-baseline gap-2 mr-2">
+                  <span className="text-2xl font-black tracking-[-0.03em]">{formatGBP(trip.total_price)}</span>
+                  <span className="text-[12px] text-ink-muted font-semibold">total</span>
+                </div>
+                <div className="flex-1" />
                 <button
-                  data-testid="trip-remove-btn"
-                  onClick={onDelete}
-                  className="icon-btn text-red-500 border-red-200 hover:border-red-400"
-                  aria-label="Remove"
-                  disabled={busy === 'delete'}
-                >
-                  <Trash2 size={16} />
-                </button>
-              ) : (
-                <button
-                  data-testid="trip-save-btn"
-                  onClick={onSave}
+                  data-testid="trip-share-btn"
+                  onClick={onShare}
                   className="icon-btn"
-                  disabled={busy === 'save'}
-                  aria-label="Save"
+                  aria-label="Share"
                 >
-                  <Bookmark size={16} />
+                  <Share2 size={16} />
                 </button>
-              )}
-              <button
-                data-testid="trip-watch-btn"
-                onClick={onWatch}
-                disabled={busy === 'watch'}
-                className={cn(
-                  'inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg border text-[13px] font-bold transition-colors',
-                  watching
-                    ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
-                    : 'bg-white border-ink/10 hover:border-ink/30',
+                {savedId ? (
+                  <button
+                    data-testid="trip-remove-btn"
+                    onClick={onDelete}
+                    className="icon-btn text-red-500 border-red-200 hover:border-red-400"
+                    aria-label="Remove"
+                    disabled={busy === 'delete'}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                ) : (
+                  <button
+                    data-testid="trip-save-btn"
+                    onClick={onSave}
+                    className="icon-btn"
+                    disabled={busy === 'save'}
+                    aria-label="Save"
+                  >
+                    <Bookmark size={16} />
+                  </button>
                 )}
-              >
-                {watching ? <Bell size={14} /> : <BellOff size={14} />}
-                {watching ? 'Watching' : 'Watch price'}
-              </button>
-              <a
-                href={trip.affiliate_flight_url}
-                target="_blank"
-                rel="noreferrer"
-                data-testid="trip-book-flight-btn"
-                className="btn-light h-11"
-              >
-                <Plane size={14} />
-                Book flight
-                <ExternalLink size={12} />
-              </a>
-              <a
-                href={trip.affiliate_hotel_url}
-                target="_blank"
-                rel="noreferrer"
-                data-testid="trip-book-hotel-btn"
-                className="btn-primary h-11"
-              >
-                <Hotel size={14} />
-                Book hotel
-                <ExternalLink size={12} />
-              </a>
+                <button
+                  data-testid="trip-watch-btn"
+                  onClick={onWatch}
+                  disabled={busy === 'watch'}
+                  className={cn(
+                    'inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg border text-[13px] font-bold transition-colors',
+                    watching
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                      : 'bg-white border-ink/10 hover:border-ink/30',
+                  )}
+                >
+                  {watching ? <Bell size={14} /> : <BellOff size={14} />}
+                  {watching ? 'Watching' : 'Watch price'}
+                </button>
+                <a
+                  href={trip.affiliate_flight_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  data-testid="trip-book-flight-btn"
+                  className="btn-light h-11"
+                >
+                  <Plane size={14} />
+                  Book flight
+                  <ExternalLink size={12} />
+                </a>
+                <a
+                  href={trip.affiliate_hotel_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  data-testid="trip-book-hotel-btn"
+                  className="btn-primary h-11"
+                >
+                  <Hotel size={14} />
+                  Book hotel
+                  <ExternalLink size={12} />
+                </a>
+              </div>
             </div>
           </div>
         </div>

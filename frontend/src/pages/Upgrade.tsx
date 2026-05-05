@@ -83,7 +83,7 @@ export default function UpgradePage() {
         <section className="relative bg-navy-950 text-white overflow-hidden">
           <div className="absolute inset-0 gradient-mesh opacity-90" />
           <div className="absolute inset-0 grid-bg opacity-50" />
-          <div className="relative max-w-[1280px] mx-auto px-8 py-16 lg:py-24 grid lg:grid-cols-12 gap-12 items-center">
+          <div className="relative max-w-[1280px] mx-auto px-4 md:px-8 py-10 md:py-16 lg:py-24 grid lg:grid-cols-12 gap-8 md:gap-12 items-center">
             <div className="lg:col-span-7">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
                 <Sparkles size={12} className="text-amber-300" />
@@ -91,22 +91,22 @@ export default function UpgradePage() {
                   TRIPOPT PRO
                 </span>
               </div>
-              <h1 className="mt-6 text-5xl lg:text-7xl font-black tracking-[-0.04em] leading-[0.95]">
+              <h1 className="mt-4 md:mt-6 text-4xl md:text-5xl lg:text-7xl font-black tracking-[-0.04em] leading-[0.95]">
                 Beat the price.
                 <br />
                 <span className="bg-gradient-to-r from-amber-300 via-emerald-300 to-blue-300 bg-clip-text text-transparent">
                   Every time.
                 </span>
               </h1>
-              <p className="mt-5 text-[16px] text-white/65 max-w-xl leading-relaxed">
+              <p className="mt-4 md:mt-5 text-[14px] md:text-[16px] text-white/65 max-w-xl leading-relaxed">
                 Pro adds SMS price alerts, early-window pricing, and priority routing for long-haul
                 optimisation. Cancel anytime.
               </p>
-              <ul className="mt-8 space-y-3 text-[15px] text-white/85">
+              <ul className="mt-6 md:mt-8 space-y-2 md:space-y-3 text-[13px] md:text-[15px] text-white/85">
                 {BENEFITS.map((b) => (
-                  <li key={b} className="flex items-start gap-3">
-                    <span className="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Check size={12} className="text-emerald-300" />
+                  <li key={b} className="flex items-start gap-2 md:gap-3">
+                    <span className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Check size={10} className="text-emerald-300" />
                     </span>
                     <span>{b}</span>
                   </li>

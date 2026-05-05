@@ -129,7 +129,7 @@ export default function ResultsPage() {
         <section className="relative bg-navy-950 text-white overflow-hidden">
           <div className="absolute inset-0 gradient-mesh opacity-90" />
           <div className="absolute inset-0 grid-bg opacity-40" />
-          <div className="relative max-w-[1280px] mx-auto px-8 py-12 lg:py-16">
+          <div className="relative max-w-[1280px] mx-auto px-4 md:px-8 py-8 md:py-12 lg:py-16">
             <button
               data-testid="results-back-btn"
               onClick={() => navigate('/')}
@@ -138,11 +138,11 @@ export default function ResultsPage() {
               <ArrowLeft size={14} />
               EDIT SEARCH
             </button>
-            <div className="mt-6 grid lg:grid-cols-12 gap-10 items-end">
+            <div className="mt-4 md:mt-6 grid lg:grid-cols-12 gap-6 md:gap-10 items-end">
               <div className="lg:col-span-7">
                 <div className="label-eyebrow text-white/60">YOUR PORTFOLIO</div>
                 <h1
-                  className="mt-3 text-4xl lg:text-6xl font-black tracking-[-0.04em] leading-[0.96]"
+                  className="mt-2 md:mt-3 text-3xl md:text-4xl lg:text-6xl font-black tracking-[-0.04em] leading-[0.96]"
                   data-testid="results-headline"
                 >
                   {headline ? (
@@ -157,12 +157,12 @@ export default function ResultsPage() {
                   )}
                 </h1>
                 {headline && (
-                  <p className="mt-4 text-[16px] text-white/70 max-w-2xl leading-relaxed">
+                  <p className="mt-3 md:mt-4 text-[14px] md:text-[16px] text-white/70 max-w-2xl leading-relaxed">
                     {headline.headline}
                   </p>
                 )}
               </div>
-              <div className="lg:col-span-5 grid grid-cols-3 gap-3">
+              <div className="lg:col-span-5 grid grid-cols-3 gap-2 md:gap-3">
                 <BannerStat
                   label="COMBOS"
                   value={response.searched_combinations.toLocaleString()}
@@ -175,9 +175,9 @@ export default function ResultsPage() {
         </section>
 
         {/* Trip cards */}
-        <section className="max-w-[1280px] mx-auto px-8 py-12 lg:py-16">
+        <section className="max-w-[1280px] mx-auto px-4 md:px-8 py-8 md:py-12 lg:py-16">
           {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
-          <div className="grid lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {response.options.map((o, i) => (
               <TripCard
                 key={o.id}

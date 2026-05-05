@@ -23,7 +23,7 @@ export default function TopNav({
           : 'bg-white/80 border-ink/[0.06] text-ink',
       )}
     >
-      <div className="max-w-[1280px] mx-auto px-8 h-16 flex items-center justify-between gap-6">
+      <div className="max-w-[1280px] mx-auto px-4 md:px-8 h-14 md:h-16 flex items-center justify-between gap-3 md:gap-6">
         <Link to="/" className="flex items-center gap-2.5 group">
           <div
             className={cn(
@@ -101,7 +101,7 @@ export default function TopNav({
               </Link>
               <div
                 className={cn(
-                  'flex items-center gap-2.5 px-2.5 h-9 rounded-lg',
+                  'flex items-center gap-1.5 md:gap-2.5 px-2 md:px-2.5 h-9 rounded-lg',
                   dark ? 'bg-white/5 border border-white/10' : 'bg-ink/[0.03] border border-ink/[0.08]',
                 )}
                 title={user.email}
@@ -118,7 +118,7 @@ export default function TopNav({
                     {user.name.charAt(0).toUpperCase()}
                   </div>
                 )}
-                <span className="text-[12px] font-semibold max-w-[110px] truncate">{user.name}</span>
+                <span className="hidden sm:block text-[12px] font-semibold max-w-[110px] truncate">{user.name}</span>
                 {user.is_pro && (
                   <Sparkles size={12} className={dark ? 'text-amber-300' : 'text-amber-500'} />
                 )}

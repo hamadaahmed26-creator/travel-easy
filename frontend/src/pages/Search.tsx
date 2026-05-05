@@ -148,7 +148,7 @@ export default function SearchPage() {
           <div className="absolute inset-0 gradient-mesh" />
           <div className="absolute inset-0 grid-bg opacity-60" />
 
-          <div className="relative max-w-[1280px] mx-auto px-8 py-16 lg:py-24 grid lg:grid-cols-12 gap-12 items-center">
+          <div className="relative max-w-[1280px] mx-auto px-4 md:px-8 py-10 md:py-16 lg:py-24 grid lg:grid-cols-12 gap-8 md:gap-12 items-center">
             <div className="lg:col-span-7 z-10">
               <motion.div
                 initial={{ opacity: 0, y: 12 }}
@@ -162,7 +162,7 @@ export default function SearchPage() {
                   </span>
                 </div>
                 <h1
-                  className="mt-6 text-5xl lg:text-7xl font-black tracking-[-0.04em] leading-[0.95]"
+                  className="mt-4 md:mt-6 text-4xl md:text-5xl lg:text-7xl font-black tracking-[-0.04em] leading-[0.95]"
                   data-testid="screen-title"
                 >
                   Optimise the
@@ -171,12 +171,12 @@ export default function SearchPage() {
                     whole trip.
                   </span>
                 </h1>
-                <p className="mt-6 text-[17px] leading-relaxed text-white/70 max-w-xl">
+                <p className="mt-4 md:mt-6 text-[15px] md:text-[17px] leading-relaxed text-white/70 max-w-xl">
                   We search every flight + hotel combo across your dates, score them like a portfolio,
                   and tell you whether to <span className="text-emerald-300 font-semibold">book now</span> or{' '}
                   <span className="text-amber-300 font-semibold">wait</span>. Cheapest combined cost wins.
                 </p>
-                <div className="mt-10 flex flex-wrap gap-6">
+                <div className="mt-6 md:mt-10 flex flex-wrap gap-4 md:gap-6">
                   <Stat number="4,400+" label="airports searched" />
                   <Stat number="30 days" label="price history & forecast" />
                   <Stat number="3 ranks" label="cheapest · value · risk" />
@@ -198,12 +198,12 @@ export default function SearchPage() {
 
         {/* FORM */}
         <section className="flex-1 bg-white">
-          <div className="max-w-[1280px] mx-auto px-8 py-12 lg:py-16">
-            <div className="grid lg:grid-cols-12 gap-10">
+          <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-8 md:py-12 lg:py-16">
+            <div className="grid lg:grid-cols-12 gap-8 md:gap-10">
               {/* Left: Form */}
               <div className="lg:col-span-7">
-                <div className="flex items-baseline justify-between mb-8">
-                  <h2 className="text-3xl lg:text-4xl font-black tracking-[-0.03em]">
+                <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 mb-6 md:mb-8">
+                  <h2 className="text-2xl md:text-3xl lg:text-4xl font-black tracking-[-0.03em]">
                     Build your search
                   </h2>
                   <span className="label-eyebrow">STEP 01 · INPUTS</span>

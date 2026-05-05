@@ -65,18 +65,18 @@ export default function AlertsPage() {
         <section className="relative bg-navy-950 text-white overflow-hidden">
           <div className="absolute inset-0 gradient-mesh opacity-90" />
           <div className="absolute inset-0 grid-bg opacity-50" />
-          <div className="relative max-w-[1280px] mx-auto px-8 py-12 lg:py-16">
+          <div className="relative max-w-[1280px] mx-auto px-4 md:px-8 py-8 md:py-12 lg:py-16">
             <div className="label-eyebrow text-white/60">PRICE WATCH · INBOX</div>
-            <h1 className="mt-3 text-5xl lg:text-6xl font-black tracking-[-0.04em] leading-[0.95]" data-testid="alerts-headline">
+            <h1 className="mt-2 md:mt-3 text-3xl md:text-5xl lg:text-6xl font-black tracking-[-0.04em] leading-[0.95]" data-testid="alerts-headline">
               Alerts
             </h1>
-            <p className="mt-4 text-[16px] text-white/70 max-w-2xl">
+            <p className="mt-3 md:mt-4 text-[14px] md:text-[16px] text-white/70 max-w-2xl">
               We notify you when watched trips drop, change recommendation, or hit your budget.
             </p>
           </div>
         </section>
 
-        <section className="max-w-[1280px] mx-auto px-8 py-12">
+        <section className="max-w-[1280px] mx-auto px-4 md:px-8 py-8 md:py-12">
           {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
 
           {items === null ? (
