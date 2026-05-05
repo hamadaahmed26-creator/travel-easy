@@ -528,7 +528,9 @@ async def search_airports(q: str = Query("", min_length=0, max_length=50),
         elif query in country:
             score = 45
         if score:
-            if a.get("is_large"):
+            if a.get("is_city_group"):
+                score += 15  # surface "All London airports" above individual ones
+            elif a.get("is_large"):
                 score += 5
             scored.append((score, a))
     scored.sort(key=lambda t: -t[0])

@@ -3,7 +3,19 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const BASE = process.env.EXPO_PUBLIC_BACKEND_URL;
 const TOKEN_KEY = "tripopt:session_token";
 
-export type Airport = { code: string; city: string; country?: string; name: string; lat?: number; lng?: number; region?: string };
+export type Airport = {
+  code: string;
+  city: string;
+  country?: string;
+  country_name?: string;
+  name: string;
+  lat?: number;
+  lng?: number;
+  region?: string;
+  is_large?: boolean;
+  is_city_group?: boolean;
+  member_codes?: string[];
+};
 export type Destination = {
   code: string; city: string; country: string;
   weather: "sun" | "city" | "both";

@@ -276,18 +276,86 @@ async def load_airports() -> tuple[dict[str, dict], list[dict]]:
     for a in enriched:
         a["country_name"] = ISO2_TO_NAME.get(a.get("country") or "", a.get("country") or "")
 
-    # Build "All [City]" group entries for cities with 2+ large airports.
-    groups: dict[tuple[str, str], list[dict]] = {}
+    # Build "All [City]" group entries for cities with 2+ relevant airports.
+    # Curated metro areas: well-known multi-airport cities where the airports may
+    # have varying municipality strings ("London", "London, Essex", "Luton" ->
+    # all part of the London metro). Map: canonical_city -> set of IATA codes.
+    METRO_AREAS: dict[tuple[str, str], list[str]] = {
+        ("London", "GB"): ["LHR", "LGW", "STN", "LTN", "LCY", "SEN"],
+        ("New York", "US"): ["JFK", "LGA", "EWR"],
+        ("Washington", "US"): ["IAD", "DCA", "BWI"],
+        ("Chicago", "US"): ["ORD", "MDW"],
+        ("Houston", "US"): ["IAH", "HOU"],
+        ("Dallas", "US"): ["DFW", "DAL"],
+        ("Tokyo", "JP"): ["HND", "NRT"],
+        ("Osaka", "JP"): ["KIX", "ITM"],
+        ("Paris", "FR"): ["CDG", "ORY", "BVA"],
+        ("Milan", "IT"): ["MXP", "LIN", "BGY"],
+        ("Rome", "IT"): ["FCO", "CIA"],
+        ("Berlin", "DE"): ["BER"],
+        ("Moscow", "RU"): ["SVO", "DME", "VKO"],
+        ("Istanbul", "TR"): ["IST", "SAW"],
+        ("Stockholm", "SE"): ["ARN", "BMA", "NYO"],
+        ("Oslo", "NO"): ["OSL", "TRF"],
+        ("Buenos Aires", "AR"): ["EZE", "AEP"],
+        ("S\u00e3o Paulo", "BR"): ["GRU", "CGH", "VCP"],
+        ("Rio de Janeiro", "BR"): ["GIG", "SDU"],
+        ("Mexico City", "MX"): ["MEX", "NLU"],
+        ("Bangkok", "TH"): ["BKK", "DMK"],
+        ("Seoul", "KR"): ["ICN", "GMP"],
+        ("Shanghai", "CN"): ["PVG", "SHA"],
+        ("Beijing", "CN"): ["PEK", "PKX"],
+        ("Taipei", "TW"): ["TPE", "TSA"],
+        ("Jakarta", "ID"): ["CGK", "HLP"],
+        ("Kuala Lumpur", "MY"): ["KUL", "SZB"],
+        ("Manila", "PH"): ["MNL", "CRK"],
+        ("Bali", "ID"): ["DPS"],
+    }
+
+    by_code_pre = {a["code"]: a for a in enriched}
+    city_groups: list[dict] = []
+    for (display_city, country), codes in METRO_AREAS.items():
+        members = [by_code_pre[c] for c in codes if c in by_code_pre]
+        if len(members) < 2:
+            continue
+        avg_lat = sum(m["lat"] for m in members) / len(members)
+        avg_lng = sum(m["lng"] for m in members) / len(members)
+        member_codes = [m["code"] for m in members]
+        slug = "".join(ch for ch in display_city.lower() if ch.isalnum())
+        country_name = ISO2_TO_NAME.get(country, country)
+        city_groups.append({
+            "code": f"CITY:{slug}-{country}",
+            "name": f"All {display_city} airports",
+            "city": display_city,
+            "country": country,
+            "country_name": country_name,
+            "lat": round(avg_lat, 4),
+            "lng": round(avg_lng, 4),
+            "is_large": True,
+            "is_city_group": True,
+            "member_codes": member_codes,
+            "weather": members[0].get("weather", "city"),
+            "base_hotel": members[0].get("base_hotel", 110),
+            "volatility": members[0].get("volatility", 0.15),
+            "region": members[0].get("region", "OT"),
+        })
+
+    # Also auto-detect any other 2+-large-airport cities not in METRO_AREAS.
+    seen_keys = {(g["city"].lower(), g["country"]) for g in city_groups}
+    auto_groups: dict[tuple[str, str], list[dict]] = {}
     for a in enriched:
         if not a.get("is_large"):
             continue
-        key = (a["city"].lower().split("(")[0].strip(), a.get("country") or "")
-        groups.setdefault(key, []).append(a)
-    city_groups: list[dict] = []
-    for (city_norm, country), members in groups.items():
+        # Normalize "London, Essex" -> "London"; strip parentheticals.
+        norm = a["city"].lower().split("(")[0].split(",")[0].strip()
+        key = (norm, a.get("country") or "")
+        if key in seen_keys:
+            continue
+        auto_groups.setdefault(key, []).append(a)
+    for (city_norm, country), members in auto_groups.items():
         if len(members) < 2:
             continue
-        display_city = members[0]["city"].split("(")[0].strip()
+        display_city = members[0]["city"].split("(")[0].split(",")[0].strip()
         avg_lat = sum(m["lat"] for m in members) / len(members)
         avg_lng = sum(m["lng"] for m in members) / len(members)
         member_codes = [m["code"] for m in members]

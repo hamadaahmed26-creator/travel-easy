@@ -59,7 +59,7 @@ export default function SearchScreen() {
 
   const [airports, setAirports] = useState<Airport[]>([]);
   const [destinations, setDestinations] = useState<Destination[]>([]);
-  const [departure, setDeparture] = useState<string>("BRS");
+  const [departure, setDeparture] = useState<string | null>(null);
   const [destination, setDestination] = useState<string | null>(null);
   const [budget, setBudget] = useState<number>(500);
   const [tripLength, setTripLength] = useState<number>(4);
@@ -128,7 +128,7 @@ export default function SearchScreen() {
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
   const departureMeta = useMemo(
-    () => airports.find((a) => a.code === departure),
+    () => (departure ? airports.find((a) => a.code === departure) : undefined),
     [airports, departure]
   );
   const destinationMeta = useMemo(
@@ -138,6 +138,10 @@ export default function SearchScreen() {
 
   const onOptimise = async () => {
     setError(null);
+    if (!departure) {
+      setError("Pick a departure airport first.");
+      return;
+    }
     setSubmitting(true);
     const req: OptimizeRequest = {
       departure,
@@ -256,18 +260,35 @@ export default function SearchScreen() {
                   <FieldLabel>FROM</FieldLabel>
                   <FieldRow
                     testID="departure-input"
-                    icon="airplane-outline"
-                    title={departureMeta ? `${departureMeta.city} (${departureMeta.code})` : "Pick airport"}
-                    sub={departureMeta ? `${departureMeta.name}${departureMeta.country ? ` · ${departureMeta.country}` : ""}` : "Any departure airport"}
+                    icon={departureMeta?.is_city_group ? "globe-outline" : "airplane-outline"}
+                    title={departureMeta
+                      ? departureMeta.is_city_group
+                        ? `All ${departureMeta.city} airports`
+                        : `${departureMeta.city} (${departureMeta.code})`
+                      : "Pick airport"}
+                    sub={departureMeta
+                      ? departureMeta.is_city_group
+                        ? `${(departureMeta.member_codes ?? []).join(" · ")}${departureMeta.country ? ` · ${departureMeta.country}` : ""}`
+                        : `${departureMeta.name}${departureMeta.country ? ` · ${departureMeta.country}` : ""}`
+                      : "Tap to choose any airport — or pick All [city] for multi-airport cities"}
+                    accent={!departureMeta}
                     onPress={() => { setPickerSearch(""); setPickerOpen("departure"); }}
                   />
 
                   <FieldLabel>TO</FieldLabel>
                   <FieldRow
                     testID="destination-input"
-                    icon={destination ? "location-outline" : "globe-outline"}
-                    title={destination ? `${destinationMeta?.city ?? destination} (${destination})` : "Anywhere"}
-                    sub={destination ? destinationMeta?.country ?? "" : "Let the optimiser hunt globally"}
+                    icon={destinationMeta?.is_city_group ? "globe-outline" : destination ? "location-outline" : "globe-outline"}
+                    title={destination
+                      ? destinationMeta?.is_city_group
+                        ? `All ${destinationMeta.city} airports`
+                        : `${destinationMeta?.city ?? destination} (${destination})`
+                      : "Anywhere"}
+                    sub={destination
+                      ? destinationMeta?.is_city_group
+                        ? `${(destinationMeta.member_codes ?? []).join(" · ")}${destinationMeta.country ? ` · ${destinationMeta.country}` : ""}`
+                        : destinationMeta?.country ?? ""
+                      : "Let the optimiser hunt globally"}
                     accent={!destination}
                     rightAdornment={destination ? (
                       <Pressable
@@ -445,34 +466,56 @@ export default function SearchScreen() {
                   </Text>
                 )
               }
-              renderItem={({ item }: any) => (
-                <TouchableOpacity
-                  testID={`picker-item-${item.code}`}
-                  style={styles.pickerRow}
-                  onPress={async () => {
-                    if (pickerOpen === "departure") {
-                      setDeparture(item.code);
-                      await pushRecent(RECENT_DEP_KEY, item.code);
-                      setRecentDep(await loadRecent(RECENT_DEP_KEY));
-                    } else {
-                      setDestination(item.code);
-                      await pushRecent(RECENT_DEST_KEY, item.code);
-                      setRecentDest(await loadRecent(RECENT_DEST_KEY));
-                    }
-                    setPickerOpen(null);
-                  }}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.pickerCity}>
-                      {item.city}{item.country ? `, ${item.country}` : ""}
+              renderItem={({ item }: any) => {
+                const isCityGroup = !!item.is_city_group;
+                const memberCount = (item.member_codes ?? []).length;
+                return (
+                  <TouchableOpacity
+                    testID={`picker-item-${item.code}`}
+                    style={[styles.pickerRow, isCityGroup && styles.pickerRowGroup]}
+                    onPress={async () => {
+                      if (pickerOpen === "departure") {
+                        setDeparture(item.code);
+                        await pushRecent(RECENT_DEP_KEY, item.code);
+                        setRecentDep(await loadRecent(RECENT_DEP_KEY));
+                      } else {
+                        setDestination(item.code);
+                        await pushRecent(RECENT_DEST_KEY, item.code);
+                        setRecentDest(await loadRecent(RECENT_DEST_KEY));
+                      }
+                      setPickerOpen(null);
+                    }}
+                  >
+                    <View style={[styles.pickerIcon, isCityGroup && styles.pickerIconGroup]}>
+                      <Ionicons
+                        name={isCityGroup ? "globe-outline" : "airplane-outline"}
+                        size={isCityGroup ? 18 : 14}
+                        color={isCityGroup ? colors.brandStrong : colors.inkMuted}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <Text style={[styles.pickerCity, isCityGroup && styles.pickerCityGroup]}>
+                          {isCityGroup ? `All ${item.city} airports` : `${item.city}${item.country ? `, ${item.country}` : ""}`}
+                        </Text>
+                        {isCityGroup ? (
+                          <View style={styles.groupBadge}>
+                            <Text style={styles.groupBadgeText}>{memberCount} AIRPORTS</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      <Text style={styles.pickerSub} numberOfLines={1}>
+                        {isCityGroup
+                          ? `${(item.member_codes ?? []).join(" · ")}${item.country ? ` · ${item.country}` : ""}`
+                          : (item.name || (item as any).region || "")}
+                      </Text>
+                    </View>
+                    <Text style={[styles.pickerCode, isCityGroup && styles.pickerCodeGroup]}>
+                      {isCityGroup ? "ALL" : item.code}
                     </Text>
-                    <Text style={styles.pickerSub}>
-                      {item.name || (item as any).region || ""}
-                    </Text>
-                  </View>
-                  <Text style={styles.pickerCode}>{item.code}</Text>
-                </TouchableOpacity>
-              )}
+                  </TouchableOpacity>
+                );
+              }}
             />
           </View>
         </View>
@@ -766,13 +809,42 @@ const styles = StyleSheet.create({
   },
   pickerRow: {
     flexDirection: "row", alignItems: "center", paddingVertical: spacing.md,
-    borderBottomWidth: 1, borderBottomColor: colors.border,
+    borderBottomWidth: 1, borderBottomColor: colors.border, gap: spacing.md,
+  },
+  pickerRowGroup: {
+    backgroundColor: colors.riskLowBg,
+    borderRadius: radii.md,
+    borderBottomColor: "transparent",
+    borderWidth: 1, borderColor: colors.borderGlow,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  pickerIcon: {
+    width: 36, height: 36, borderRadius: 10,
+    alignItems: "center", justifyContent: "center",
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+  },
+  pickerIconGroup: {
+    backgroundColor: colors.brand, borderColor: colors.brandStrong,
   },
   pickerCity: { fontSize: 15, fontWeight: "700", color: colors.ink },
+  pickerCityGroup: { fontWeight: "900", color: colors.ink },
   pickerSub: { fontSize: 12, color: colors.inkMuted, marginTop: 2 },
   pickerCode: {
     fontSize: 13, fontWeight: "800", color: colors.brand, letterSpacing: 1,
   },
+  pickerCodeGroup: {
+    fontSize: 10, fontWeight: "900", color: "#fff", letterSpacing: 1.4,
+    backgroundColor: colors.brand,
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: radii.pill, overflow: "hidden",
+  },
+  groupBadge: {
+    paddingHorizontal: 6, paddingVertical: 2,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: 1, borderColor: colors.borderGlow,
+  },
+  groupBadgeText: { fontSize: 9, fontWeight: "900", color: colors.brandStrong, letterSpacing: 1 },
   searchHint: {
     fontSize: 11, color: colors.inkMuted, fontWeight: "700",
     letterSpacing: 1, marginBottom: spacing.sm,
