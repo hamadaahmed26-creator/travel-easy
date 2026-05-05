@@ -101,3 +101,100 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: |
+  Convert this Expo mobile app to a React web app. Keep the FastAPI backend
+  and MongoDB as-is. Rebuild the frontend with React + Tailwind for desktop
+  browsers. Style direction: hybrid layouts (1c), make it WOW.
+
+backend:
+  - task: "FastAPI server kept as-is (TripOpt backend)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Backend untouched aside from installing missing runtime deps
+          (apscheduler, httpx) into the venv and adding them to
+          requirements.txt. All endpoints (/api/airports, /api/destinations,
+          /api/airports/search, /api/optimize, /api/auth/*, /api/trips,
+          /api/trips/{id}/watch, /api/payments/*, /api/notifications) are
+          serving 200 OK from FastAPI on port 8001 and reachable via the new
+          Vite dev server proxy at /api/*.
+
+frontend:
+  - task: "Replace Expo frontend with Vite + React + Tailwind desktop SPA"
+    implemented: true
+    working: true
+    file: "/app/frontend (full rewrite)"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Full rewrite of the frontend. Old Expo project preserved at
+          /app/frontend.expo.bak. New stack: Vite 6 + React 19 + TypeScript +
+          Tailwind 3 + react-router-dom 7 + framer-motion + recharts +
+          lucide-react. Supervisor expo command (read-only) is honoured via a
+          shim binary at node_modules/.bin/expo that hands off to vite on
+          port 3000. Vite proxies /api/* to http://localhost:8001 so requests
+          work both in container preview and behind the public ingress.
+
+          Pages built (all desktop-first, hybrid layouts, dark navy hero
+          panels with animated gradient meshes, big bold display numbers):
+          - / Search: split hero + animated globe SVG + glass form card,
+            picker modal with debounced live airport search, recent search
+            chips, big bold £ slider with presets, weather + hotel chips.
+          - /loading: cinematic gradient mesh hero with huge 01/06 counter
+            and stage progress list.
+          - /results: dark verdict banner with gradient headline + 3-col
+            grid of trip cards with hover lift, rank chips, recommendation
+            dots, save bookmark with optimistic state.
+          - /trip/:id: huge gradient price hero, verdict + Recharts price
+            history/forecast chart (history solid, forecast dashed), 3-col
+            grid (Flight / Hotel / Why this trip dark card with glow),
+            sticky bottom action bar (Share / Save / Watch / Book flight /
+            Book hotel).
+          - /saved: dark hero + grid of saved trip cards with watch
+            toggle, open and delete actions; empty state.
+          - /alerts: inbox-style list with read/unread states and routing
+            to source saved trip.
+          - /login: split-screen with dark left value-prop and right
+            Google CTA; handles Emergent OAuth #session_id hash exchange.
+          - /upgrade: hero with benefits list + premium pricing card with
+            Stripe checkout + automatic ?session_id= polling on return.
+
+          Verified end-to-end: airports load, picker live search hits
+          /api/airports/search?q=barc, /api/optimize completes successfully,
+          results -> trip detail navigation works, sparkline renders with
+          live price_history + price_forecast, confidence renders correctly
+          as 65% (helper handles both 0-1 and 0-100 inputs).
+
+metadata:
+  created_by: "main_agent"
+  version: "2.0"
+  test_sequence: 0
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Replace Expo frontend with Vite + React + Tailwind desktop SPA"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Frontend has been fully replaced with a React + Vite + Tailwind
+      desktop web app. Backend is unchanged. End-to-end flow verified
+      manually via screenshots (search -> loading -> results -> trip
+      detail). Ready for user smoke test or formal frontend testing if the
+      user requests it.
