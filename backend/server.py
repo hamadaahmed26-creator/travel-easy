@@ -95,6 +95,7 @@ class OptimizeRequest(BaseModel):
     weather: Literal["sun", "city", "any"] = "any"
     hotel_standard: Literal["budget", "mid", "any"] = "any"
     start_window_days: int = Field(30, ge=1, le=180)
+    mystery: bool = False  # When True, restrict Anywhere search to well-known cities only.
 
 
 class FlightOption(BaseModel):
@@ -346,6 +347,13 @@ def _optimise(req: OptimizeRequest) -> OptimizeResponse:
             d for d in DESTINATIONS
             if d["code"] not in dep_set and _norm_city(d["city"]) != dep_city_norm
         ]
+        # Mystery mode: restrict to well-known popular destinations only so reveals
+        # are aspirational and shareable (Lisbon, Bali, Tokyo) — not obscure cities.
+        if req.mystery:
+            popular_set = set(POPULAR_DESTINATIONS)
+            popular_dests = [d for d in dests if d["code"] in popular_set]
+            if popular_dests:
+                dests = popular_dests
     if req.weather != "any":
         dests = [d for d in dests if d["weather"] == req.weather or d["weather"] == "both"]
     all_candidates = []

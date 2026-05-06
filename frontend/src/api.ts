@@ -64,6 +64,7 @@ export type OptimizeRequest = {
   weather: "sun" | "city" | "any";
   hotel_standard: "budget" | "mid" | "any";
   start_window_days: number;
+  mystery?: boolean;
 };
 export type User = {
   user_id: string; email: string; name: string;

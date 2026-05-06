@@ -120,11 +120,13 @@ export default function MysteryScreen() {
             hotel_standard: "any",
             start_window_days: 30,
           };
-      // Force destination null + add randomness via budget jitter so each roll varies
+      // Force destination null + mystery flag (popular cities only)
+      // and add randomness via budget jitter so each roll varies.
       const jitter = Math.floor((Math.random() - 0.5) * 60);
       const req: OptimizeRequest = {
         ...baseReq,
         destination: null,
+        mystery: true,
         budget: Math.max(150, (baseReq.budget ?? 500) + jitter),
       };
       setRequest(req);
