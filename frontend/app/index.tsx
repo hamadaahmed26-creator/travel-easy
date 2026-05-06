@@ -237,6 +237,26 @@ export default function SearchScreen() {
     }
   };
 
+  const onSurpriseMe = async () => {
+    setError(null);
+    const req: OptimizeRequest = {
+      departure: departure ?? "LHR",
+      destination: null,
+      budget,
+      trip_length: tripLength,
+      flexibility_days: Math.max(flexibility, 7),
+      weather: "any",
+      hotel_standard: "any",
+      start_window_days: 30,
+    };
+    try {
+      await AsyncStorage.setItem("tripopt:mystery_req", JSON.stringify(req));
+      router.push("/mystery");
+    } catch (e: any) {
+      setError(e.message ?? "Could not start mystery");
+    }
+  };
+
   return (
     <View style={styles.root}>
       {/* Cinematic gradient backdrop */}
@@ -483,6 +503,29 @@ export default function SearchScreen() {
                         <Ionicons name="arrow-forward" size={18} color="#fff" />
                       </>
                     )}
+                  </Pressable>
+
+                  <Pressable
+                    testID="surprise-me-btn"
+                    style={({ pressed, hovered }: any) => [
+                      styles.surpriseCta,
+                      hovered && { transform: [{ translateY: -1 }] },
+                      pressed && { opacity: 0.85 },
+                    ]}
+                    onPress={onSurpriseMe}
+                  >
+                    <LinearGradient
+                      colors={["#A78BFA", "#7C5BFF"] as any}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={StyleSheet.absoluteFill}
+                    />
+                    <Text style={styles.surpriseEmoji}>🎁</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.surpriseText}>Surprise me · £{budget}</Text>
+                      <Text style={styles.surpriseSub}>Let TripOpt pick a mystery destination</Text>
+                    </View>
+                    <Ionicons name="sparkles" size={18} color="#fff" />
                   </Pressable>
 
                   <Text style={styles.disclaimer}>
@@ -912,6 +955,17 @@ const styles = StyleSheet.create({
   },
   ctaHover: { transform: [{ translateY: -1 }] },
   ctaText: { color: "#fff", fontWeight: "800", fontSize: 16, letterSpacing: 0.2 },
+
+  surpriseCta: {
+    marginTop: spacing.md, height: 64, borderRadius: radii.lg,
+    flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.lg,
+    gap: spacing.md, overflow: "hidden",
+    shadowColor: "#7C5BFF", shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5, shadowRadius: 16,
+  },
+  surpriseEmoji: { fontSize: 26 },
+  surpriseText: { color: "#fff", fontWeight: "900", fontSize: 16, letterSpacing: -0.3 },
+  surpriseSub: { color: "rgba(255,255,255,0.85)", fontSize: 12, marginTop: 1 },
 
   disclaimer: {
     fontSize: 11, color: colors.inkMuted, textAlign: "center",
