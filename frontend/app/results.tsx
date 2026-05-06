@@ -6,9 +6,9 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
-  TouchableOpacity,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -47,6 +47,15 @@ export default function ResultsScreen() {
   const openDetail = async (trip: TripOption) => {
     await AsyncStorage.setItem(ACTIVE_KEY, JSON.stringify(trip));
     router.push(`/trip/${trip.id}`);
+  };
+
+  const onShareVerdict = async () => {
+    if (!cheapest || !request) return;
+    const saving = Math.round(cheapest.savings_vs_budget);
+    const message = saving >= 0
+      ? `🌍 TripOpt found ${cheapest.destination_city} for £${Math.round(cheapest.total_price)} — that's £${saving} under my £${request.budget} budget. Try it: tripopt.app`
+      : `🌍 TripOpt found ${cheapest.destination_city} for £${Math.round(cheapest.total_price)} (closest to my £${request.budget} budget). Try it: tripopt.app`;
+    try { await Share.share({ message, title: "My TripOpt deal" }); } catch {}
   };
 
   if (loading) {
@@ -121,6 +130,20 @@ export default function ResultsScreen() {
                     emphasis={cheapest.savings_vs_budget >= 0 ? "good" : "bad"}
                   />
                 </View>
+
+                <Pressable
+                  testID="share-verdict-btn"
+                  onPress={onShareVerdict}
+                  style={({ hovered }: any) => [styles.shareCta, hovered && { transform: [{ translateY: -1 }] }]}
+                >
+                  <LinearGradient colors={[...colors.gradAccent] as any} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+                  <Ionicons name="share-social" size={18} color="#fff" />
+                  <Text style={styles.shareCtaText}>
+                    {cheapest.savings_vs_budget >= 0
+                      ? `Share my £${Math.round(cheapest.savings_vs_budget)} saving`
+                      : "Share this trip"}
+                  </Text>
+                </Pressable>
               </View>
             </Animated.View>
           ) : null}
@@ -292,6 +315,16 @@ const styles = StyleSheet.create({
   },
   verdictSub: { fontSize: 14, color: colors.inkSecondary, marginTop: spacing.sm, lineHeight: 20, maxWidth: 600 },
   verdictStatsRow: { flexDirection: "row", gap: spacing.md, marginTop: spacing.lg, flexWrap: "wrap" },
+  shareCta: {
+    marginTop: spacing.lg,
+    height: 52, borderRadius: radii.lg,
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: spacing.sm, overflow: "hidden",
+    shadowColor: colors.brand,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5, shadowRadius: 18,
+  },
+  shareCtaText: { color: "#fff", fontWeight: "900", fontSize: 15, letterSpacing: 0.2 },
   stat: {
     flex: 1, minWidth: 110,
     backgroundColor: "rgba(0,0,0,0.4)",

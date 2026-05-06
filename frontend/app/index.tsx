@@ -51,6 +51,29 @@ async function loadRecent(key: string): Promise<string[]> {
 type WeatherPref = "any" | "sun" | "city";
 type HotelPref = "any" | "budget" | "mid";
 
+const QUICK_TRIPS: Array<{
+  emoji: string;
+  label: string;
+  budget: number;
+  nights: number;
+  weather: WeatherPref;
+}> = [
+  { emoji: "🏖", label: "Sunny weekend", budget: 350, nights: 3, weather: "sun" },
+  { emoji: "🌍", label: "Big adventure", budget: 800, nights: 7, weather: "any" },
+  { emoji: "🍷", label: "City break", budget: 500, nights: 4, weather: "city" },
+];
+
+function _haversineKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const r = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * r * Math.asin(Math.sqrt(a));
+}
+
 export default function SearchScreen() {
   const router = useRouter();
   const { user, refresh } = useAuth();
@@ -76,6 +99,9 @@ export default function SearchScreen() {
   const debounceRef = useRef<any>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [nearestSuggested, setNearestSuggested] = useState<Airport | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -126,6 +152,48 @@ export default function SearchScreen() {
   }, [pickerOpen]);
 
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
+
+  const findNearestAirport = useCallback(async () => {
+    if (Platform.OS !== "web" || typeof navigator === "undefined" || !navigator.geolocation) {
+      setError("Location not supported on this device.");
+      return;
+    }
+    setLocating(true);
+    setError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const candidates = airports.filter(
+          (a) => a.is_large && !a.is_city_group && a.lat != null && a.lng != null
+        );
+        if (!candidates.length) { setLocating(false); return; }
+        let best = candidates[0];
+        let bestD = Number.POSITIVE_INFINITY;
+        for (const a of candidates) {
+          const d = _haversineKm(latitude, longitude, a.lat as number, a.lng as number);
+          if (d < bestD) { bestD = d; best = a; }
+        }
+        setNearestSuggested(best);
+        setDeparture(best.code);
+        pushRecent(RECENT_DEP_KEY, best.code);
+        setLocating(false);
+      },
+      () => {
+        setError("Couldn't get your location. Pick an airport manually.");
+        setLocating(false);
+      },
+      { timeout: 8000, maximumAge: 600000 }
+    );
+  }, [airports]);
+
+  const fillQuickTrip = useCallback((q: typeof QUICK_TRIPS[number]) => {
+    setBudget(q.budget);
+    setTripLength(q.nights);
+    setWeather(q.weather);
+    setHotelPref("any");
+    setFlexibility(3);
+    setDestination(null);
+  }, []);
 
   const departureMeta = useMemo(
     () => (departure ? airports.find((a) => a.code === departure) : undefined),
@@ -198,6 +266,14 @@ export default function SearchScreen() {
               </View>
             </View>
             <View style={{ flexDirection: "row", gap: spacing.sm }}>
+              <Pressable
+                testID="how-link-btn"
+                onPress={() => router.push("/how")}
+                style={({ hovered }: any) => [styles.howLink, hovered && { backgroundColor: colors.surfaceHover }]}
+              >
+                <Ionicons name="help-circle-outline" size={14} color={colors.brandStrong} />
+                <Text style={styles.howLinkText}>How it works</Text>
+              </Pressable>
               {user ? (
                 <IconBtn icon="notifications-outline" onPress={() => router.push("/alerts")} testID="open-alerts-btn" />
               ) : null}
@@ -257,7 +333,37 @@ export default function SearchScreen() {
                     Tell us your budget — we'll hunt for the best total deal.
                   </Text>
 
+                  {/* Quick-start templates */}
+                  <Text style={styles.fieldLabel}>QUICK START</Text>
+                  <View style={styles.quickTripsRow}>
+                    {QUICK_TRIPS.map((q) => (
+                      <Pressable
+                        key={q.label}
+                        testID={`quick-trip-${q.label.replace(/\s+/g, "-").toLowerCase()}`}
+                        onPress={() => fillQuickTrip(q)}
+                        style={({ hovered }: any) => [styles.quickTrip, hovered && styles.quickTripHover]}
+                      >
+                        <Text style={styles.quickEmoji}>{q.emoji}</Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.quickLabel}>{q.label}</Text>
+                          <Text style={styles.quickSub}>£{q.budget} · {q.nights}n</Text>
+                        </View>
+                      </Pressable>
+                    ))}
+                  </View>
+
                   <FieldLabel>FROM</FieldLabel>
+                  <Pressable
+                    testID="use-location-btn"
+                    onPress={findNearestAirport}
+                    disabled={locating}
+                    style={({ hovered }: any) => [styles.locationPill, hovered && { backgroundColor: colors.surfaceHover }]}
+                  >
+                    <Ionicons name="locate-outline" size={14} color={colors.brandStrong} />
+                    <Text style={styles.locationPillText}>
+                      {locating ? "Finding nearest airport…" : nearestSuggested ? `Nearest: ${nearestSuggested.code}` : "Use my location"}
+                    </Text>
+                  </Pressable>
                   <FieldRow
                     testID="departure-input"
                     icon={departureMeta?.is_city_group ? "globe-outline" : "airplane-outline"}
@@ -670,6 +776,37 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   iconBtnHover: { backgroundColor: colors.surfaceHover, borderColor: colors.borderStrong },
+  howLink: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: spacing.md, height: 40, borderRadius: 12,
+    borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface,
+  },
+  howLinkText: { color: colors.brandStrong, fontSize: 12, fontWeight: "800", letterSpacing: 0.4 },
+  quickTripsRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.xs },
+  quickTrip: {
+    flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    borderRadius: radii.md, borderWidth: 1, borderColor: colors.borderGlow,
+    backgroundColor: colors.riskLowBg, minWidth: 0,
+  },
+  quickTripHover: { backgroundColor: colors.surfaceHover, borderColor: colors.brandStrong },
+  quickEmoji: { fontSize: 18 },
+  quickLabel: { color: colors.ink, fontWeight: "800", fontSize: 13 },
+  quickSub: { color: colors.brandStrong, fontSize: 11, fontWeight: "700", marginTop: 1 },
+  locationPill: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    alignSelf: "flex-start",
+    paddingHorizontal: spacing.md, paddingVertical: 6,
+    borderRadius: radii.pill, borderWidth: 1, borderColor: colors.borderGlow,
+    backgroundColor: colors.riskLowBg, marginBottom: spacing.sm,
+  },
+  locationPillText: { color: colors.brandStrong, fontSize: 11, fontWeight: "800", letterSpacing: 0.4 },
+  advancedToggle: {
+    flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start",
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    borderRadius: radii.md, marginTop: spacing.lg,
+  },
+  advancedToggleText: { color: colors.brandStrong, fontSize: 12, fontWeight: "800", letterSpacing: 0.4 },
   scroll: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl, gap: spacing.xl },
   scrollWide: { paddingHorizontal: spacing.xxxl, alignItems: "center" },
   heroLayout: { gap: spacing.xl, width: "100%" },
