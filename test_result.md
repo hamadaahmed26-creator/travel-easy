@@ -178,17 +178,40 @@ test_plan:
   test_all: false
   test_priority: "high_first"
 
-  - task: "Polish remaining screens (login, upgrade, saved, alerts, loading) to match cinematic dark navy"
+  - task: "Mystery Trip mode (popular cities only) + How-it-works shortcut callout"
     implemented: true
     working: "NA"
-    file: "/app/frontend/app/login.tsx, /app/frontend/app/upgrade.tsx, /app/frontend/app/saved.tsx, /app/frontend/app/alerts.tsx, /app/frontend/app/loading.tsx"
+    file: "/app/frontend/app/mystery.tsx, /app/frontend/app/how.tsx, /app/backend/server.py, /app/backend/airport_data.py"
     stuck_count: 0
-    priority: "medium"
-    needs_retesting: true
+    priority: "high"
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "All secondary screens now use LinearGradient backdrop, gradient CTAs, glass cards, glowing empty-state icons. Saved + Alerts use HoverCard with lift on hover and pull-to-refresh. Login has the globe decoration on wide screens. Loading has cinematic backdrop, brand-coloured stage tracker, and shimmer animation."
+        comment: |
+          Killer differentiator shipped. Mystery Trip mode: purple Surprise-Me CTA on home,
+          dedicated /mystery screen with blur-reveal animation, share-ready copy, re-roll
+          button. Backend gets `mystery: bool` flag on /api/optimize that filters Anywhere
+          search to POPULAR_DESTINATIONS only (Lisbon, Bratislava, Budapest, Tokyo etc.) so
+          every reveal is aspirational + shareable. /how page gets a purple shortcut callout
+          linking straight to /mystery.
+
+  - task: "Step 1 UX simplification (10-year-old test): quick-start chips, use-my-location, advanced toggle, big share, /how"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/index.tsx, /app/frontend/app/results.tsx, /app/frontend/app/how.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          5 friction-reducing fixes shipped: 3 Quick Start chips (Sunny weekend / Big
+          adventure / City break), Use-my-location pill auto-detects nearest airport,
+          Weather + Hotel hidden behind "Show advanced" toggle, big gradient Share button
+          on results with pre-formatted copy, /how 30-second explainer page linked from
+          home toolbar. Now 4 taps from landing → shareable trip.
 
 agent_communication:
   - agent: "main"

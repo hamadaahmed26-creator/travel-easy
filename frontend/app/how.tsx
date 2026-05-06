@@ -90,6 +90,25 @@ export default function HowItWorks() {
             ))}
           </View>
 
+          {/* Mystery Trip shortcut — playful alternative path */}
+          <Animated.View entering={FadeInUp.duration(420).delay(320)}>
+            <Pressable
+              testID="how-mystery-cta"
+              onPress={() => router.replace("/mystery")}
+              style={({ hovered }: any) => [styles.mysteryCta, hovered && { transform: [{ translateY: -1 }] }]}
+            >
+              <LinearGradient colors={["#A78BFA", "#7C5BFF"] as any} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+              <Text style={styles.mysteryEmoji}>🎁</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.mysteryTitle}>Don't feel like thinking?</Text>
+                <Text style={styles.mysterySub}>
+                  Hit Surprise Me — we'll pick a mystery destination for your budget. Reveal it when you're ready.
+                </Text>
+              </View>
+              <Ionicons name="sparkles" size={18} color="#fff" />
+            </Pressable>
+          </Animated.View>
+
           <Animated.View entering={FadeInUp.duration(420).delay(380)} style={styles.ctaWrap}>
             <Pressable
               testID="how-cta"
@@ -160,4 +179,16 @@ const styles = StyleSheet.create({
   },
   ctaText: { color: "#fff", fontWeight: "900", fontSize: 16 },
   fineprint: { color: colors.inkMuted, fontSize: 12 },
+
+  mysteryCta: {
+    flexDirection: "row", alignItems: "center", gap: spacing.md,
+    padding: spacing.lg, borderRadius: radii.xl,
+    overflow: "hidden",
+    shadowColor: "#7C5BFF", shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5, shadowRadius: 18,
+    marginTop: spacing.md,
+  },
+  mysteryEmoji: { fontSize: 32 },
+  mysteryTitle: { color: "#fff", fontSize: 16, fontWeight: "900", letterSpacing: -0.3 },
+  mysterySub: { color: "rgba(255,255,255,0.9)", fontSize: 13, lineHeight: 18, marginTop: 2 },
 });
